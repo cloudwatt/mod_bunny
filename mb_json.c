@@ -155,19 +155,18 @@ int mb_json_parse_config(char *file, mb_config_t *mb_config) {
     json_t          *json_local_servicegroups = NULL;
     json_t          *json_retry_wait_time = NULL;
     json_t          *json_debug = NULL;
-    const char      *host = NULL;
-    int             port;
-    const char      *vhost = NULL;
-    const char      *user = NULL;
-    const char      *password = NULL;
-    const char      *publisher_exchange = NULL;
-    const char      *publisher_exchange_type = NULL;
-    const char      *publisher_routing_key = NULL;
-    const char      *consumer_exchange = NULL;
-    const char      *consumer_exchange_type = NULL;
-    const char      *consumer_queue = NULL;
-    const char      *consumer_binding_key = NULL;
-    int             retry_wait_time;
+
+    #define PARSE_JSON_STRING(element, json_obj, dst_str) {                             \
+        const char *tmp_str = NULL;                                                     \
+        if ((tmp_str = json_string_value(json_obj)) == NULL) {                          \
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: " \
+                "`%s' setting value must be a JSON string", element);                   \
+            return (MB_NOK);                                                            \
+        } else {                                                                        \
+            memset(dst_str, 0, MB_BUF_LEN);                                             \
+            strncpy(dst_str, tmp_str, MB_BUF_LEN - 1);                                  \
+        }                                                                               \
+    }
 
     if (!(json_config = json_load_file(file, 0, &json_error))) {
         if (json_error.line == -1)
@@ -180,116 +179,85 @@ int mb_json_parse_config(char *file, mb_config_t *mb_config) {
         return (MB_NOK);
     }
 
-    // TODO: define and use macros for enforcing JSON value types and values retrieving:
-    // JSON_PARSE_STRING()
-    // JSON_PARSE_BOOL()
-
-    if ((json_host = json_object_get(json_config, "host"))) {
-        if ((host = json_string_value(json_host))) {
-            memset(mb_config->host, 0, MB_BUF_LEN);
-            strncpy(mb_config->host, host, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_host = json_object_get(json_config, "host")))
+        PARSE_JSON_STRING("host", json_host, mb_config->host);
 
     if ((json_port = json_object_get(json_config, "port"))) {
-        if ((port = json_integer_value(json_port))) {
-            if (port > 0 && port < 65535)
-                mb_config->port = port;
+        mb_config->port = json_integer_value(json_port);
+
+        if (mb_config->port <= 0 || mb_config->port > 65535) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
+                "invalid `port' setting value %d", mb_config->port);
+            return (MB_NOK);
         }
     }
 
-    if ((json_vhost = json_object_get(json_config, "vhost"))) {
-        if ((vhost = json_string_value(json_vhost))) {
-            memset(mb_config->vhost, 0, MB_BUF_LEN);
-            strncpy(mb_config->vhost, vhost, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_vhost = json_object_get(json_config, "vhost")))
+        PARSE_JSON_STRING("vhost", json_vhost, mb_config->vhost);
 
-    if ((json_user = json_object_get(json_config, "user"))) {
-        if ((user = json_string_value(json_user))) {
-            memset(mb_config->user, 0, MB_BUF_LEN);
-            strncpy(mb_config->user, user, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_user = json_object_get(json_config, "user")))
+        PARSE_JSON_STRING("user", json_user, mb_config->user);
 
-    if ((json_password = json_object_get(json_config, "password"))) {
-        if ((password = json_string_value(json_password))) {
-            memset(mb_config->password, 0, MB_BUF_LEN);
-            strncpy(mb_config->password, password, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_password = json_object_get(json_config, "password")))
+        PARSE_JSON_STRING("password", json_password, mb_config->password);
 
-    if ((json_publisher_exchange = json_object_get(json_config, "publisher_exchange"))) {
-        if ((publisher_exchange = json_string_value(json_publisher_exchange))) {
-            memset(mb_config->publisher_exchange, 0, MB_BUF_LEN);
-            strncpy(mb_config->publisher_exchange, publisher_exchange, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_publisher_exchange = json_object_get(json_config, "publisher_exchange")))
+        PARSE_JSON_STRING("publisher_exchange",
+            json_publisher_exchange,
+            mb_config->publisher_exchange);
 
-    if ((json_publisher_exchange_type = json_object_get(json_config, "publisher_exchange_type"))) {
-        if ((publisher_exchange_type = json_string_value(json_publisher_exchange_type))) {
-            memset(mb_config->publisher_exchange_type, 0, MB_BUF_LEN);
-            strncpy(mb_config->publisher_exchange_type, publisher_exchange_type, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_publisher_exchange_type = json_object_get(json_config, "publisher_exchange_type")))
+        PARSE_JSON_STRING("publisher_exchange_type",
+            json_publisher_exchange_type,
+            mb_config->publisher_exchange_type);
 
-    if ((json_publisher_routing_key = json_object_get(json_config, "publisher_routing_key"))) {
-        if ((publisher_routing_key = json_string_value(json_publisher_routing_key))) {
-            memset(mb_config->publisher_routing_key, 0, MB_BUF_LEN);
-            strncpy(mb_config->publisher_routing_key, publisher_routing_key, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_publisher_routing_key = json_object_get(json_config, "publisher_routing_key")))
+        PARSE_JSON_STRING("publisher_routing_key",
+            json_publisher_routing_key,
+            mb_config->publisher_routing_key);
 
-    if ((json_consumer_exchange = json_object_get(json_config, "consumer_exchange"))) {
-        if ((consumer_exchange = json_string_value(json_consumer_exchange))) {
-            memset(mb_config->consumer_exchange, 0, MB_BUF_LEN);
-            strncpy(mb_config->consumer_exchange, consumer_exchange, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_consumer_exchange = json_object_get(json_config, "consumer_exchange")))
+        PARSE_JSON_STRING("consumer_exchange",
+            json_consumer_exchange,
+            mb_config->consumer_exchange);
 
-    if ((json_consumer_exchange_type = json_object_get(json_config, "consumer_exchange_type"))) {
-        if ((consumer_exchange_type = json_string_value(json_consumer_exchange_type))) {
-            memset(mb_config->consumer_exchange_type, 0, MB_BUF_LEN);
-            strncpy(mb_config->consumer_exchange_type, consumer_exchange_type, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_consumer_exchange_type = json_object_get(json_config, "consumer_exchange_type")))
+        PARSE_JSON_STRING("consumer_exchange_type",
+            json_consumer_exchange_type,
+            mb_config->consumer_exchange_type);
 
-    if ((json_consumer_queue = json_object_get(json_config, "consumer_queue"))) {
-        if ((consumer_queue = json_string_value(json_consumer_queue))) {
-            memset(mb_config->consumer_queue, 0, MB_BUF_LEN);
-            strncpy(mb_config->consumer_queue, consumer_queue, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_consumer_queue = json_object_get(json_config, "consumer_queue")))
+        PARSE_JSON_STRING("consumer_queue",
+            json_consumer_queue,
+            mb_config->consumer_queue);
 
-    if ((json_consumer_binding_key = json_object_get(json_config, "consumer_binding_key"))) {
-        if ((consumer_binding_key = json_string_value(json_consumer_binding_key))) {
-            memset(mb_config->consumer_binding_key, 0, MB_BUF_LEN);
-            strncpy(mb_config->consumer_binding_key, consumer_binding_key, MB_BUF_LEN - 1);
-        }
-    }
+    if ((json_consumer_binding_key = json_object_get(json_config, "consumer_binding_key")))
+        PARSE_JSON_STRING("consumer_binding_key",
+            json_consumer_binding_key,
+            mb_config->consumer_binding_key);
 
     if ((json_local_hostgroups = json_object_get(json_config, "local_hostgroups"))) {
-        if (json_array_size(json_local_hostgroups) > 0) {
+        if (json_array_size(json_local_hostgroups) > 0)
             mb_config->local_hstgroups = mb_json_parse_local_hostgroups(json_local_hostgroups);
-        }
     }
 
     if ((json_local_servicegroups = json_object_get(json_config, "local_servicegroups"))) {
-        if (json_array_size(json_local_servicegroups) > 0) {
+        if (json_array_size(json_local_servicegroups) > 0)
             mb_config->local_svcgroups = mb_json_parse_local_servicegroups(json_local_servicegroups);
-        }
     }
 
     if ((json_retry_wait_time = json_object_get(json_config, "retry_wait_time"))) {
-        if ((retry_wait_time = json_integer_value(json_retry_wait_time))) {
-            if (retry_wait_time > 0 && retry_wait_time < MB_MAX_RETRY_WAIT_TIME)
-                mb_config->retry_wait_time = retry_wait_time;
+        mb_config->retry_wait_time = json_integer_value(json_retry_wait_time);
+
+        if (mb_config->retry_wait_time <= 0 || mb_config->retry_wait_time > MB_MAX_RETRY_WAIT_TIME) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
+                "invalid `retry_wait_time' setting value %d", mb_config->retry_wait_time);
+            return (MB_NOK);
         }
     }
 
-    if ((json_debug = json_object_get(json_config, "debug"))) {
+    if ((json_debug = json_object_get(json_config, "debug")))
         mb_config->debug = (json_is_true(json_debug) ? true : false);
-    }
 
     json_decref(json_config);
 
