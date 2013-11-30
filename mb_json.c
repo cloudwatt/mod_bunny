@@ -186,7 +186,7 @@ static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegr
     int             servicegroups_added;
 
     if (json_array_size(json_local_servicegroups) == 0)
-        return (MB_NOK);
+        return (MB_OK);
 
     mb_local_servicegroups = (mb_svcgroups_t **)dst;
 
@@ -240,7 +240,7 @@ int mb_json_parse_config(char *file, mb_config_t *mb_config) {
 /* {{{ */
     json_error_t        json_error;
     json_t              *json_config = NULL;
-    json_t              *setting_value = NULL;
+    json_t              *json_setting_value = NULL;
 
     mb_json_config_setting_t config_settings[] = {
         { "host", mb_config->host, mb_json_is_string,
@@ -290,15 +290,18 @@ int mb_json_parse_config(char *file, mb_config_t *mb_config) {
     }
 
     for (mb_json_config_setting_t *setting = config_settings; setting->name ; setting++) {
-        if ((setting_value = json_object_get(json_config, setting->name))) {
-            if (!setting->type_check(setting_value)) {
+        if ((json_setting_value = json_object_get(json_config, setting->name))) {
+            if (!setting->type_check(json_setting_value)) {
                 logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
                     "incorrect value type for setting `%s'", setting->name);
                 return (MB_NOK);
             }
 
-            if (!setting->parse(setting_value, setting->value, setting->check))
+            if (!setting->parse(json_setting_value, setting->value, setting->check)) {
+                logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
+                    "invalid value for setting `%s'", setting->name);
                 return (MB_NOK);
+            }
         }
     }
 
