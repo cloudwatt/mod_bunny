@@ -2,7 +2,7 @@ NAGIOS_SOURCES  ?= ../nagios-3.5.0
 NAGIOS_3_5_X    ?= `echo $(NAGIOS_SOURCES) | grep -Ec "nagios[3]?[-_]3\.5"`
 
 CC      ?= gcc
-CFLAGS  ?= -std=gnu99 -Wall -g -O2 -shared -fPIC
+CFLAGS  ?= -std=gnu99 -W -Wall -g -O2 -shared -fPIC
 LDFLAGS ?= -I$(NAGIOS_SOURCES)/include
 LDLIBS  ?= -lpthread -lrabbitmq -ljansson
 
