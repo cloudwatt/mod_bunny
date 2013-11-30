@@ -23,28 +23,122 @@
 #include <jansson.h>
 
 #include "mod_bunny.h"
+#include "mb_json.h"
 
-#define TIMEVAL_TO_FLOAT(t) ((double)t.tv_sec + ((double)t.tv_usec / 1000000.0))
-#define FLOAT_TO_TIMEVAL(f, t) { t.tv_sec = f; t.tv_usec = (f - (double)t.tv_sec) * 1000000; }
-
-static mb_hstgroups_t *mb_json_parse_local_hostgroups(json_t *json_local_hostgroups) {
+static inline int mb_json_config_check_broker_port(void *data) {
 /* {{{ */
-    mb_hstgroups_t  *mb_local_hostgroups = NULL;
+   int port = *(int *)data;
+
+    if (port <= 0 || port > 65535) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: configuration error: "
+            "invalid `port' setting value %d", port);
+        return (MB_NOK);
+    }
+
+    return (MB_OK);
+/* }}} */
+}
+
+static inline int mb_json_config_check_retry_wait_time(void *data) {
+/* {{{ */
+   int retry_wait_time = *(int *)data;
+
+    if (retry_wait_time <= 0 || retry_wait_time > MB_MAX_RETRY_WAIT_TIME) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
+            "invalid `retry_wait_time' setting value %d", retry_wait_time);
+        return (MB_NOK);
+    }
+
+    return (MB_OK);
+/* }}} */
+}
+
+static inline bool mb_json_is_string(json_t *obj) {
+/* {{{ */
+    return json_is_string(obj);
+/* }}} */
+}
+
+static inline bool mb_json_is_integer(json_t *obj) {
+/* {{{ */
+    return json_is_integer(obj);
+/* }}} */
+}
+
+static inline bool mb_json_is_boolean(json_t *obj) {
+/* {{{ */
+    return json_is_boolean(obj);
+/* }}} */
+}
+
+static inline bool mb_json_is_array(json_t *obj) {
+/* {{{ */
+    return json_is_array(obj);
+/* }}} */
+}
+
+static inline int mb_json_parse_string(json_t *json_obj, void *dst, int (*check)(void *)) {
+/* {{{ */
+    const char *tmp_str = NULL;
+
+    tmp_str = json_string_value(json_obj);
+    memset(dst, 0, MB_BUF_LEN);
+    strncpy((char *)dst, tmp_str, MB_BUF_LEN - 1);
+
+    /* Perform check on parsed value if specified */
+    if (check) {
+        if (!check(dst))
+            return (MB_NOK);
+    }
+
+    return (MB_OK);
+/* }}} */
+}
+
+static inline int mb_json_parse_int(json_t *json_obj, void *dst, int (*check)(void *)) {
+/* {{{ */
+    *(int *)dst = json_integer_value(json_obj);
+
+    /* Perform check on parsed value if specified */
+    if (check) {
+        if (!check(dst))
+            return (MB_NOK);
+    }
+
+    return (MB_OK);
+/* }}} */
+}
+
+static inline int mb_json_parse_bool(json_t *json_obj, void *dst, int (*check)(void *)) {
+/* {{{ */
+    *(bool *)dst = (json_is_true(json_obj) ? true : false);
+
+    return (MB_OK);
+/* }}} */
+}
+
+static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, void *dst, int (*check)(void *)) {
+/* {{{ */
+    mb_hstgroups_t  **mb_local_hostgroups = NULL;
     mb_hstgroup_t   *hostgroup = NULL;
     const char      *hostgroup_pattern = NULL;
     int             hostgroups_added;
 
-    if (!(mb_local_hostgroups = calloc(1, sizeof(mb_hstgroup_t)))) {
+    if (json_array_size(json_local_hostgroups) == 0)
+        return (MB_OK);
+
+    mb_local_hostgroups = (mb_hstgroups_t **)dst;
+
+    if (!(*mb_local_hostgroups = calloc(1, sizeof(mb_hstgroup_t)))) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_hostgroups: error: "
             "unable to allocate memory");
-        return (NULL);
-
+        return (MB_NOK);
     }
 
-    TAILQ_INIT(mb_local_hostgroups);
+    TAILQ_INIT(*mb_local_hostgroups);
 
     hostgroups_added = 0;
-     for (int i = 0; i < json_array_size(json_local_hostgroups); i++) {
+     for (int i = 0; i < (int)json_array_size(json_local_hostgroups); i++) {
         if (!(hostgroup_pattern = json_string_value(json_array_get(json_local_hostgroups, i)))) {
             logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_hostgroups: error: "
                 "unable to get hostgroup value, skipping");
@@ -64,7 +158,7 @@ static mb_hstgroups_t *mb_json_parse_local_hostgroups(json_t *json_local_hostgro
             goto error;
         }
 
-        TAILQ_INSERT_TAIL(mb_local_hostgroups, hostgroup, tq);
+        TAILQ_INSERT_TAIL(*mb_local_hostgroups, hostgroup, tq);
         hostgroups_added++;
     }
 
@@ -72,33 +166,38 @@ static mb_hstgroups_t *mb_json_parse_local_hostgroups(json_t *json_local_hostgro
     if (hostgroups_added == 0)
         goto error;
 
-    return (mb_local_hostgroups);
+    return (MB_OK);
 
     error:
-    mb_free_local_hostgroups_list(mb_local_hostgroups);
-    free(mb_local_hostgroups);
-    return (NULL);
+    mb_free_local_hostgroups_list(*mb_local_hostgroups);
+    free(*mb_local_hostgroups);
+    return (MB_NOK);
 /* }}} */
 }
 
-static mb_svcgroups_t *mb_json_parse_local_servicegroups(json_t *json_local_servicegroups) {
+static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegroups, void *dst,
+    int (*check)(void *)) {
 /* {{{ */
-    mb_svcgroups_t  *mb_local_servicegroups = NULL;
+    mb_svcgroups_t  **mb_local_servicegroups = NULL;
     mb_svcgroup_t   *servicegroup = NULL;
     const char      *servicegroup_pattern = NULL;
     int             servicegroups_added;
 
-    if (!(mb_local_servicegroups = calloc(1, sizeof(mb_svcgroup_t)))) {
+    if (json_array_size(json_local_servicegroups) == 0)
+        return (MB_NOK);
+
+    mb_local_servicegroups = (mb_svcgroups_t **)dst;
+
+    if (!(*mb_local_servicegroups = calloc(1, sizeof(mb_svcgroup_t)))) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_servicegroups: error: "
             "unable to allocate memory");
-        return (NULL);
-
+        return (MB_NOK);
     }
 
-    TAILQ_INIT(mb_local_servicegroups);
+    TAILQ_INIT(*mb_local_servicegroups);
 
     servicegroups_added = 0;
-     for (int i = 0; i < json_array_size(json_local_servicegroups); i++) {
+     for (int i = 0; i < (int)json_array_size(json_local_servicegroups); i++) {
         if (!(servicegroup_pattern = json_string_value(json_array_get(json_local_servicegroups, i)))) {
             logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_servicegroups: error: "
                 "unable to get servicegroup value, skipping");
@@ -118,7 +217,7 @@ static mb_svcgroups_t *mb_json_parse_local_servicegroups(json_t *json_local_serv
             goto error;
         }
 
-        TAILQ_INSERT_TAIL(mb_local_servicegroups, servicegroup, tq);
+        TAILQ_INSERT_TAIL(*mb_local_servicegroups, servicegroup, tq);
         servicegroups_added++;
     }
 
@@ -126,47 +225,56 @@ static mb_svcgroups_t *mb_json_parse_local_servicegroups(json_t *json_local_serv
     if (servicegroups_added == 0)
         goto error;
 
-    return (mb_local_servicegroups);
+    return (MB_OK);
 
     error:
-    mb_free_local_servicegroups_list(mb_local_servicegroups);
-    free(mb_local_servicegroups);
-    return (NULL);
+    mb_free_local_servicegroups_list(*mb_local_servicegroups);
+    free(*mb_local_servicegroups);
+    return (MB_NOK);
 /* }}} */
 }
 
 int mb_json_parse_config(char *file, mb_config_t *mb_config) {
 /* {{{ */
-    json_error_t    json_error;
-    json_t          *json_config = NULL;
-    json_t          *json_host = NULL;
-    json_t          *json_port = NULL;
-    json_t          *json_vhost = NULL;
-    json_t          *json_user = NULL;
-    json_t          *json_password = NULL;
-    json_t          *json_publisher_exchange = NULL;
-    json_t          *json_publisher_exchange_type = NULL;
-    json_t          *json_publisher_routing_key = NULL;
-    json_t          *json_consumer_exchange = NULL;
-    json_t          *json_consumer_exchange_type = NULL;
-    json_t          *json_consumer_queue = NULL;
-    json_t          *json_consumer_binding_key = NULL;
-    json_t          *json_local_hostgroups = NULL;
-    json_t          *json_local_servicegroups = NULL;
-    json_t          *json_retry_wait_time = NULL;
-    json_t          *json_debug = NULL;
+    json_error_t        json_error;
+    json_t              *json_config = NULL;
+    json_t              *setting_value = NULL;
 
-    #define PARSE_JSON_STRING(element, json_obj, dst_str) {                             \
-        const char *tmp_str = NULL;                                                     \
-        if ((tmp_str = json_string_value(json_obj)) == NULL) {                          \
-            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: " \
-                "`%s' setting value must be a JSON string", element);                   \
-            return (MB_NOK);                                                            \
-        } else {                                                                        \
-            memset(dst_str, 0, MB_BUF_LEN);                                             \
-            strncpy(dst_str, tmp_str, MB_BUF_LEN - 1);                                  \
-        }                                                                               \
-    }
+    mb_json_config_setting_t config_settings[] = {
+        { "host", mb_config->host, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "port", &mb_config->port, mb_json_is_integer, mb_json_parse_int,
+            mb_json_config_check_broker_port },
+        { "vhost", mb_config->vhost, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "user", mb_config->user, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "password", mb_config->password, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "publisher_exchange", mb_config->publisher_exchange, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "publisher_exchange_type", mb_config->publisher_exchange_type, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "publisher_routing_key", mb_config->publisher_routing_key, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "consumer_exchange", mb_config->consumer_exchange, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "consumer_exchange_type", mb_config->consumer_exchange_type, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "consumer_queue", mb_config->consumer_queue, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "consumer_binding_key", mb_config->consumer_binding_key, mb_json_is_string,
+            mb_json_parse_string, NULL },
+        { "local_hostgroups", &mb_config->local_hstgroups, mb_json_is_array,
+            mb_json_parse_local_hostgroups, NULL },
+        { "local_servicegroups", &mb_config->local_svcgroups, mb_json_is_array,
+            mb_json_parse_local_servicegroups, NULL },
+        { "retry_wait_time", &mb_config->retry_wait_time, mb_json_is_integer,
+            mb_json_parse_int, mb_json_config_check_retry_wait_time },
+        { "debug", &mb_config->debug, mb_json_is_boolean,
+            mb_json_parse_bool, NULL },
+        { NULL, NULL, NULL, NULL, NULL },
+    };
 
     if (!(json_config = json_load_file(file, 0, &json_error))) {
         if (json_error.line == -1)
@@ -179,85 +287,18 @@ int mb_json_parse_config(char *file, mb_config_t *mb_config) {
         return (MB_NOK);
     }
 
-    if ((json_host = json_object_get(json_config, "host")))
-        PARSE_JSON_STRING("host", json_host, mb_config->host);
+    for (mb_json_config_setting_t *setting = config_settings; setting->name ; setting++) {
+        if ((setting_value = json_object_get(json_config, setting->name))) {
+            if (!setting->type_check(setting_value)) {
+                logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
+                    "incorrect value type for setting `%s'", setting->name);
+                return (MB_NOK);
+            }
 
-    if ((json_port = json_object_get(json_config, "port"))) {
-        mb_config->port = json_integer_value(json_port);
-
-        if (mb_config->port <= 0 || mb_config->port > 65535) {
-            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
-                "invalid `port' setting value %d", mb_config->port);
-            return (MB_NOK);
+            if (!setting->parse(setting_value, setting->value, setting->check))
+                return (MB_NOK);
         }
     }
-
-    if ((json_vhost = json_object_get(json_config, "vhost")))
-        PARSE_JSON_STRING("vhost", json_vhost, mb_config->vhost);
-
-    if ((json_user = json_object_get(json_config, "user")))
-        PARSE_JSON_STRING("user", json_user, mb_config->user);
-
-    if ((json_password = json_object_get(json_config, "password")))
-        PARSE_JSON_STRING("password", json_password, mb_config->password);
-
-    if ((json_publisher_exchange = json_object_get(json_config, "publisher_exchange")))
-        PARSE_JSON_STRING("publisher_exchange",
-            json_publisher_exchange,
-            mb_config->publisher_exchange);
-
-    if ((json_publisher_exchange_type = json_object_get(json_config, "publisher_exchange_type")))
-        PARSE_JSON_STRING("publisher_exchange_type",
-            json_publisher_exchange_type,
-            mb_config->publisher_exchange_type);
-
-    if ((json_publisher_routing_key = json_object_get(json_config, "publisher_routing_key")))
-        PARSE_JSON_STRING("publisher_routing_key",
-            json_publisher_routing_key,
-            mb_config->publisher_routing_key);
-
-    if ((json_consumer_exchange = json_object_get(json_config, "consumer_exchange")))
-        PARSE_JSON_STRING("consumer_exchange",
-            json_consumer_exchange,
-            mb_config->consumer_exchange);
-
-    if ((json_consumer_exchange_type = json_object_get(json_config, "consumer_exchange_type")))
-        PARSE_JSON_STRING("consumer_exchange_type",
-            json_consumer_exchange_type,
-            mb_config->consumer_exchange_type);
-
-    if ((json_consumer_queue = json_object_get(json_config, "consumer_queue")))
-        PARSE_JSON_STRING("consumer_queue",
-            json_consumer_queue,
-            mb_config->consumer_queue);
-
-    if ((json_consumer_binding_key = json_object_get(json_config, "consumer_binding_key")))
-        PARSE_JSON_STRING("consumer_binding_key",
-            json_consumer_binding_key,
-            mb_config->consumer_binding_key);
-
-    if ((json_local_hostgroups = json_object_get(json_config, "local_hostgroups"))) {
-        if (json_array_size(json_local_hostgroups) > 0)
-            mb_config->local_hstgroups = mb_json_parse_local_hostgroups(json_local_hostgroups);
-    }
-
-    if ((json_local_servicegroups = json_object_get(json_config, "local_servicegroups"))) {
-        if (json_array_size(json_local_servicegroups) > 0)
-            mb_config->local_svcgroups = mb_json_parse_local_servicegroups(json_local_servicegroups);
-    }
-
-    if ((json_retry_wait_time = json_object_get(json_config, "retry_wait_time"))) {
-        mb_config->retry_wait_time = json_integer_value(json_retry_wait_time);
-
-        if (mb_config->retry_wait_time <= 0 || mb_config->retry_wait_time > MB_MAX_RETRY_WAIT_TIME) {
-            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
-                "invalid `retry_wait_time' setting value %d", mb_config->retry_wait_time);
-            return (MB_NOK);
-        }
-    }
-
-    if ((json_debug = json_object_get(json_config, "debug")))
-        mb_config->debug = (json_is_true(json_debug) ? true : false);
 
     json_decref(json_config);
 
