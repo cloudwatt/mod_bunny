@@ -58,7 +58,7 @@ void mb_stop_publisher_thread(void) {
 /* }}} */
 }
 
-int nebmodule_init(int flags, char *args, nebmodule *handle) {
+int nebmodule_init(int flags __attribute__((__unused__)), char *args, nebmodule *handle) {
 /* {{{ */
     mod_bunny_handle = handle;
     mod_bunny_args = args;
@@ -105,7 +105,7 @@ int nebmodule_init(int flags, char *args, nebmodule *handle) {
 /* }}} */
 }
 
-int nebmodule_deinit(int flags, int reason) {
+int nebmodule_deinit(int flags __attribute__((__unused__)), int reason __attribute__((__unused__))) {
 /* {{{ */
     /* Deregister for all events we previously registered for */
     mb_deregister_callbacks();
@@ -133,7 +133,7 @@ int nebmodule_deinit(int flags, int reason) {
 /* }}} */
 }
 
-int mb_init(int event_type, void *event_data) {
+int mb_init(int event_type __attribute__((__unused__)), void *event_data) {
 /* {{{ */
     struct nebstruct_process_struct *ps = NULL;
 

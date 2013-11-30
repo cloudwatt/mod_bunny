@@ -109,7 +109,8 @@ static inline int mb_json_parse_int(json_t *json_obj, void *dst, int (*check)(vo
 /* }}} */
 }
 
-static inline int mb_json_parse_bool(json_t *json_obj, void *dst, int (*check)(void *)) {
+static inline int mb_json_parse_bool(json_t *json_obj, void *dst,
+    int (*check)(void *) __attribute__((__unused__))) {
 /* {{{ */
     *(bool *)dst = (json_is_true(json_obj) ? true : false);
 
@@ -117,7 +118,8 @@ static inline int mb_json_parse_bool(json_t *json_obj, void *dst, int (*check)(v
 /* }}} */
 }
 
-static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, void *dst, int (*check)(void *)) {
+static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, void *dst,
+    int (*check)(void *) __attribute__((__unused__))) {
 /* {{{ */
     mb_hstgroups_t  **mb_local_hostgroups = NULL;
     mb_hstgroup_t   *hostgroup = NULL;
@@ -176,7 +178,7 @@ static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, 
 }
 
 static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegroups, void *dst,
-    int (*check)(void *)) {
+    int (*check)(void *) __attribute__((__unused__))) {
 /* {{{ */
     mb_svcgroups_t  **mb_local_servicegroups = NULL;
     mb_svcgroup_t   *servicegroup = NULL;
