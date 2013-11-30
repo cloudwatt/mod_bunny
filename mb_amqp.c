@@ -95,6 +95,13 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
 /* {{{ */
     *amqp_conn->conn = amqp_new_connection();
 
+    if (amqp_conn->debug)
+        logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: connecting to host %s:%d using vhost %s",
+            context,
+            amqp_conn->host,
+            amqp_conn->port,
+            amqp_conn->vhost);
+
     if ((*amqp_conn->sockfd = amqp_open_socket(amqp_conn->host, amqp_conn->port)) < 0) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: error: %s",
             context,
@@ -104,10 +111,7 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
     }
 
     if (amqp_conn->debug)
-        logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: connected to broker %s:%d",
-            context,
-            amqp_conn->host,
-            amqp_conn->port);
+        logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: successfully connected to broker", context);
 
     amqp_set_sockfd(*amqp_conn->conn, *amqp_conn->sockfd);
 
