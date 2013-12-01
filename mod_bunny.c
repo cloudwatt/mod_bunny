@@ -311,6 +311,7 @@ int mb_handle_event(int event_type, void *event_data) {
 int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
 /* {{{ */
     host    *hst = NULL;
+    char    *json_check = NULL;
     char    *raw_command = NULL;
     char    *processed_command = NULL;
     float   prev_latency;
@@ -354,10 +355,7 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
     if (!raw_command) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_host_check: error: "
             "host check command undefined");
-
-        hst->latency = prev_latency;
-
-        return (MB_NOK);
+        goto error;
     }
 
     /* Process any macros contained in the argument */
@@ -366,22 +364,20 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
     if (!processed_command) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_host_check: error: "
             "unable to process check command line");
-
-        hst->latency = prev_latency;
-        free(raw_command);
-
-        return (MB_NOK);
+        goto error;
     }
 
-    if (!mb_publish_host_check(hstdata, hst->check_options, processed_command)) {
+    /* Serialize host check into JSON */
+    if (!(json_check = mb_json_pack_host_check(hstdata, hst->check_options, processed_command))) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE,
+            "mod_bunny: mb_handle_host_check: error occurred while packing JSON check data");
+        goto error;
+    }
+
+    if (!mb_publish_check(json_check)) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_host_check: error: "
             "could not publish host check message");
-
-        hst->latency = prev_latency;
-        free(raw_command);
-        free(processed_command);
-
-        return (MB_NOK);
+        goto error;
     }
 
     /* Set the execution flag */
@@ -390,10 +386,25 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
     /* Increment the number of host checks that are currently running  */
     currently_running_host_checks++;
 
+    free(json_check);
     free(raw_command);
     free(processed_command);
 
     return (MB_OK);
+
+    error:
+    hst->latency = prev_latency;
+
+    if (json_check)
+        free(json_check);
+
+    if (raw_command)
+        free(raw_command);
+
+    if (processed_command)
+        free(processed_command);
+
+    return (MB_NOK);
 /* }}} */
 }
 
@@ -401,6 +412,7 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
 /* {{{ */
     host    *hst = NULL;
     service *svc = NULL;
+    char    *json_check = NULL;
     char    *raw_command = NULL;
     char    *processed_command = NULL;
     float   prev_latency;
@@ -444,10 +456,7 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     if (!raw_command) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_service_check: error: "
             "service check command undefined");
-
-        svc->latency = prev_latency;
-
-        return (MB_NOK);
+        goto error;
     }
 
     /* Process any macros contained in the argument */
@@ -456,22 +465,21 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     if (!processed_command) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_service_check: error: "
             "unable to process check command line");
+        goto error;
+    }
 
-        svc->latency = prev_latency;
-        free(raw_command);
-
-        return (MB_NOK);
+    /* Serialize service check into JSON */
+    if (!(json_check = mb_json_pack_service_check(svcdata, svc->check_options, processed_command))) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE,
+            "mod_bunny: mb_handle_service_check: error occurred while packing JSON check data");
+        goto error;
     }
 
     /* Publish the service check through the AMQP broker */
-    if (!mb_publish_service_check(svcdata, svc->check_options, processed_command)) {
+    if (!mb_publish_check(json_check)) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_service_check: error: "
             "could not publish service check message");
-
-        free(raw_command);
-        free(processed_command);
-
-        return (MB_NOK);
+        goto error;
     }
 
     /* Set the execution flag */
@@ -480,72 +488,41 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     /* Increment the number of service checks that are currently running  */
     currently_running_service_checks++;
 
+    free(json_check);
     free(raw_command);
     free(processed_command);
 
     return (MB_OK);
-/* }}} */
-}
-
-int mb_publish_host_check(nebstruct_host_check_data *hst_check, int check_options, char *command_line) {
-/* {{{ */
-    char *json_hst_check = NULL;
-
-    if (!(json_hst_check = mb_json_pack_host_check(hst_check, check_options, command_line))) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE,
-            "mod_bunny: mb_amqp_publish_host_check: error occurred while packing JSON check data");
-        goto error;
-    }
-
-    if (!mb_amqp_publish(&mod_bunny_config, json_hst_check)) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE,
-            "mod_bunny: mb_amqp_publish_host_check: error occurred while publishing message");
-        goto error;
-    }
-
-    free(json_hst_check);
-
-    return (MB_OK);
 
     error:
-    if (json_hst_check)
-        free(json_hst_check);
+    svc->latency = prev_latency;
 
-    /* In case of AMQP publishing error, disconnect from the broker as a safety measure */
-    mb_amqp_disconnect_publisher(&mod_bunny_config);
+    if (json_check)
+        free(json_check);
+
+    if (raw_command)
+        free(raw_command);
+
+    if (processed_command)
+        free(processed_command);
 
     return (MB_NOK);
 /* }}} */
 }
 
-int mb_publish_service_check(nebstruct_service_check_data *svc_check, int check_options, char *command_line) {
+int mb_publish_check(char *check) {
 /* {{{ */
-    char *json_svc_check = NULL;
-
-    if (!(json_svc_check = mb_json_pack_service_check(svc_check, check_options, command_line))) {
+    if (!mb_amqp_publish(&mod_bunny_config, check)) {
         logit(NSLOG_RUNTIME_ERROR, TRUE,
-            "mod_bunny: mb_amqp_publish_service_check: error occurred while packing JSON check data");
-        goto error;
-    }
+            "mod_bunny: mb_amqp_publish_check: error occurred while publishing message");
 
-    if (!mb_amqp_publish(&mod_bunny_config, json_svc_check)) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE,
-            "mod_bunny: mb_amqp_publish_service_check: error occurred while publishing message");
-        goto error;
-    }
+        /* In case of AMQP publishing error, disconnect from the broker as a safety measure */
+        mb_amqp_disconnect_publisher(&mod_bunny_config);
 
-    free(json_svc_check);
+        return (MB_NOK);
+    }
 
     return (MB_OK);
-
-    error:
-    if (json_svc_check)
-        free(json_svc_check);
-
-    /* In case of AMQP publishing error, disconnect from the broker as a safety measure */
-    mb_amqp_disconnect_publisher(&mod_bunny_config);
-
-    return (MB_NOK);
 /* }}} */
 }
 

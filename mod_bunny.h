@@ -128,8 +128,7 @@ int     mb_init(int, void *);
 int     mb_init_config();
 void    mb_register_callbacks(void);
 void    mb_process_check_result(char *);
-int     mb_publish_host_check(nebstruct_host_check_data *, int, char *);
-int     mb_publish_service_check(nebstruct_service_check_data *, int, char *);
+int     mb_publish_check(char *);
 
 /* mb_thread.c */
 void    *mb_thread_consume(void *);
