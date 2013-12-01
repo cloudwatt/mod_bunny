@@ -380,7 +380,7 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
         goto error;
     }
 
-    if (!mb_publish_check(json_check)) {
+    if (!mb_publish_check(json_check, mod_bunny_config.publisher_routing_key)) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_host_check: error: "
             "could not publish host check message");
         goto error;
@@ -482,7 +482,7 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     }
 
     /* Publish the service check through the AMQP broker */
-    if (!mb_publish_check(json_check)) {
+    if (!mb_publish_check(json_check, mod_bunny_config.publisher_routing_key)) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_service_check: error: "
             "could not publish service check message");
         goto error;
@@ -516,9 +516,9 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
 /* }}} */
 }
 
-int mb_publish_check(char *check) {
+int mb_publish_check(char *check, char *routing_key) {
 /* {{{ */
-    if (!mb_amqp_publish(&mod_bunny_config, check)) {
+    if (!mb_amqp_publish(&mod_bunny_config, check, routing_key)) {
         logit(NSLOG_RUNTIME_ERROR, TRUE,
             "mod_bunny: mb_amqp_publish_check: error occurred while publishing message");
 

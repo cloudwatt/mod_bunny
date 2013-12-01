@@ -128,7 +128,7 @@ int     mb_init(int, void *);
 int     mb_init_config();
 void    mb_register_callbacks(void);
 void    mb_process_check_result(char *);
-int     mb_publish_check(char *);
+int     mb_publish_check(char *, char *);
 
 /* mb_thread.c */
 void    *mb_thread_consume(void *);
@@ -140,7 +140,7 @@ int     mb_amqp_connect_publisher(mb_config_t *);
 void    mb_amqp_consume(mb_config_t *, void (*)(char *));
 int     mb_amqp_disconnect_consumer(mb_config_t *);
 int     mb_amqp_disconnect_publisher(mb_config_t *);
-int     mb_amqp_publish(mb_config_t *, char *);
+int     mb_amqp_publish(mb_config_t *, char *, char *);
 
 /* mb_json.c */
 int             mb_json_parse_config(char *, mb_config_t *);

@@ -466,7 +466,7 @@ int mb_amqp_disconnect_publisher(mb_config_t *config) {
 /* }}} */
 }
 
-int mb_amqp_publish(mb_config_t *config, char *message) {
+int mb_amqp_publish(mb_config_t *config, char *message, char *routing_key) {
 /* {{{ */
     amqp_bytes_t            message_bytes;
     amqp_basic_properties_t message_props;
@@ -486,7 +486,7 @@ int mb_amqp_publish(mb_config_t *config, char *message) {
     rc = amqp_basic_publish(config->publisher_amqp_conn,    /* connection */
         AMQP_CHANNEL,                                       /* channel */
         amqp_cstring_bytes(config->publisher_exchange),     /* exchange */
-        amqp_cstring_bytes(config->publisher_routing_key),  /* routing_key */
+        amqp_cstring_bytes(routing_key),                    /* routing_key */
         false,                                              /* mandatory */
         false,                                              /* immediate */
         &message_props,                                     /* properties */
