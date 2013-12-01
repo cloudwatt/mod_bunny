@@ -164,7 +164,7 @@ static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, 
         hostgroups_added++;
     }
 
-    // If no hostgroup pattern were successfully added to the list, destroy it
+    /* If no hostgroup pattern were successfully added to the list, destroy it */
     if (hostgroups_added == 0)
         goto error;
 
@@ -223,7 +223,7 @@ static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegr
         servicegroups_added++;
     }
 
-    // If no servicegroup pattern were successfully added to the list, destroy it
+    /* If no servicegroup pattern were successfully added to the list, destroy it */
     if (servicegroups_added == 0)
         goto error;
 

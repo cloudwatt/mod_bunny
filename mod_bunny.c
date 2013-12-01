@@ -123,7 +123,7 @@ int nebmodule_deinit(int flags __attribute__((__unused__)), int reason __attribu
     if (mod_bunny_config.debug)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: nebmodule_deinit: stopped consumer thread");
 
-    // Purge local hostgroups/servicegroups list
+    /* Purge local hostgroups/servicegroups list */
     mb_free_local_hostgroups_list(mod_bunny_config.local_hstgroups);
     mb_free_local_servicegroups_list(mod_bunny_config.local_svcgroups);
     free(mod_bunny_config.local_hstgroups);
