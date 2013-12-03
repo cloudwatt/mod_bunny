@@ -121,7 +121,7 @@ static inline int mb_json_parse_bool(json_t *json_obj, void *dst,
 static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, void *dst,
     int (*check)(void *) __attribute__((__unused__))) {
 /* {{{ */
-    mb_hstgroups_t  **mb_local_hostgroups = NULL;
+    mb_hstgroups_t  **local_hostgroups = NULL;
     mb_hstgroup_t   *hostgroup = NULL;
     const char      *hostgroup_pattern = NULL;
     int             hostgroups_added;
@@ -129,15 +129,15 @@ static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, 
     if (json_array_size(json_local_hostgroups) == 0)
         return (MB_OK);
 
-    mb_local_hostgroups = (mb_hstgroups_t **)dst;
+    local_hostgroups = (mb_hstgroups_t **)dst;
 
-    if (!(*mb_local_hostgroups = calloc(1, sizeof(mb_hstgroup_t)))) {
+    if (!(*local_hostgroups = calloc(1, sizeof(mb_hstgroups_t)))) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_hostgroups: error: "
             "unable to allocate memory");
         return (MB_NOK);
     }
 
-    TAILQ_INIT(*mb_local_hostgroups);
+    TAILQ_INIT(*local_hostgroups);
 
     hostgroups_added = 0;
      for (int i = 0; i < (int)json_array_size(json_local_hostgroups); i++) {
@@ -160,7 +160,7 @@ static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, 
             goto error;
         }
 
-        TAILQ_INSERT_TAIL(*mb_local_hostgroups, hostgroup, tq);
+        TAILQ_INSERT_TAIL(*local_hostgroups, hostgroup, tq);
         hostgroups_added++;
     }
 
@@ -171,8 +171,8 @@ static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, 
     return (MB_OK);
 
     error:
-    mb_free_local_hostgroups_list(*mb_local_hostgroups);
-    free(*mb_local_hostgroups);
+    mb_free_local_hostgroups_list(*local_hostgroups);
+    free(*local_hostgroups);
     return (MB_NOK);
 /* }}} */
 }
@@ -180,7 +180,7 @@ static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, 
 static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegroups, void *dst,
     int (*check)(void *) __attribute__((__unused__))) {
 /* {{{ */
-    mb_svcgroups_t  **mb_local_servicegroups = NULL;
+    mb_svcgroups_t  **local_servicegroups = NULL;
     mb_svcgroup_t   *servicegroup = NULL;
     const char      *servicegroup_pattern = NULL;
     int             servicegroups_added;
@@ -188,15 +188,15 @@ static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegr
     if (json_array_size(json_local_servicegroups) == 0)
         return (MB_OK);
 
-    mb_local_servicegroups = (mb_svcgroups_t **)dst;
+    local_servicegroups = (mb_svcgroups_t **)dst;
 
-    if (!(*mb_local_servicegroups = calloc(1, sizeof(mb_svcgroup_t)))) {
+    if (!(*local_servicegroups = calloc(1, sizeof(mb_svcgroups_t)))) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_servicegroups: error: "
             "unable to allocate memory");
         return (MB_NOK);
     }
 
-    TAILQ_INIT(*mb_local_servicegroups);
+    TAILQ_INIT(*local_servicegroups);
 
     servicegroups_added = 0;
      for (int i = 0; i < (int)json_array_size(json_local_servicegroups); i++) {
@@ -219,7 +219,7 @@ static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegr
             goto error;
         }
 
-        TAILQ_INSERT_TAIL(*mb_local_servicegroups, servicegroup, tq);
+        TAILQ_INSERT_TAIL(*local_servicegroups, servicegroup, tq);
         servicegroups_added++;
     }
 
@@ -230,8 +230,8 @@ static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegr
     return (MB_OK);
 
     error:
-    mb_free_local_servicegroups_list(*mb_local_servicegroups);
-    free(*mb_local_servicegroups);
+    mb_free_local_servicegroups_list(*local_servicegroups);
+    free(*local_servicegroups);
     return (MB_NOK);
 /* }}} */
 }
