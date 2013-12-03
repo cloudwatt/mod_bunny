@@ -59,13 +59,13 @@
 #define MB_DEFAULT_VHOST                    "/"
 #define MB_DEFAULT_USER                     "guest"
 #define MB_DEFAULT_PASSWORD                 "guest"
-#define MB_DEFAULT_PUBLISHER_EXCHANGE       "nagios_checks"
+#define MB_DEFAULT_PUBLISHER_EXCHANGE       "nagios"
 #define MB_DEFAULT_PUBLISHER_EXCHANGE_TYPE  "direct"
-#define MB_DEFAULT_PUBLISHER_ROUTING_KEY    ""
-#define MB_DEFAULT_CONSUMER_EXCHANGE        "nagios_results"
+#define MB_DEFAULT_PUBLISHER_ROUTING_KEY    "nagios_checks"
+#define MB_DEFAULT_CONSUMER_EXCHANGE        "nagios"
 #define MB_DEFAULT_CONSUMER_EXCHANGE_TYPE   "direct"
 #define MB_DEFAULT_CONSUMER_QUEUE           "nagios_results"
-#define MB_DEFAULT_CONSUMER_BINDING_KEY     ""
+#define MB_DEFAULT_CONSUMER_BINDING_KEY     "nagios_results"
 #define MB_DEFAULT_RETRY_WAIT_TIME          3
 #define MB_MAX_RETRY_WAIT_TIME              30
 

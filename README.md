@@ -42,13 +42,13 @@ The configuration file is using JSON format. Here are the supported settings and
 * `"vhost": "/"` Broker virtual host
 * `"user": "guest"` Broker account username
 * `"password": "guest"` Broker account password
-* `"publisher_exchange": "nagios_checks"` Broker exchange to connect to for publishing checks messages
+* `"publisher_exchange": "nagios"` Broker exchange to connect to for publishing checks messages
 * `"publisher_exchange_type": "direct"` Broker publisher exchange type*
-* `"publisher_routing_key": ""` Routing key to apply when publishing check messages
-* `"consumer_exchange": "nagios_results"` Broker exchange to connect to for consuming checks result messages
+* `"publisher_routing_key": "nagios_checks"` Routing key to apply when publishing check messages
+* `"consumer_exchange": "nagios"` Broker exchange to connect to for consuming checks result messages
 * `"consumer_exchange_type": "direct"` Broker consumer exchange type
 * `"consumer_queue": "nagios_results"` Queue to bind to for consuming check result messages
-* `"consumer_binding_key": ""` Binding key to use to consume check result messages
+* `"consumer_binding_key": "nagios_results"` Binding key to use to consume check result messages
 * `"local_hostgroups": []` Hostgroups** for which __mod_bunny__ won't override checks (Nagios-local checks)
 * `"local_servicegroups": []` Servicegroups** for which __mod_bunny__ won't override checks (Nagios-local checks)
 * `"retry_wait_time": 3` Time to wait (in seconds) before trying to reconnect to the broker
