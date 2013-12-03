@@ -131,9 +131,6 @@ static inline mb_hstgroups_t *mb_json_parse_hostgroups(json_t *json_hostgroups) 
     const char      *hostgroup_pattern = NULL;
     int             hostgroups_added = 0;
 
-    if (json_array_size(json_hostgroups) == 0)
-        return (NULL);
-
     if (!(hostgroups = calloc(1, sizeof(mb_hstgroups_t)))) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_hostgroup_list: error: "
             "unable to allocate memory");
@@ -173,7 +170,7 @@ static inline mb_hstgroups_t *mb_json_parse_hostgroups(json_t *json_hostgroups) 
     return (hostgroups);
 
     error:
-    mb_free_local_hostgroups_list(hostgroups);
+    mb_free_hostgroups(hostgroups);
     free(hostgroups);
     return (NULL);
 /* }}} */
@@ -240,59 +237,20 @@ static inline int mb_json_parse_hostgroups_routing_table(json_t *json_hostgroups
 static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, void *dst,
     int (*check)(void *) __attribute__((__unused__))) {
 /* {{{ */
-    mb_hstgroups_t  **local_hostgroups = NULL;
-    mb_hstgroup_t   *hostgroup = NULL;
-    const char      *hostgroup_pattern = NULL;
-    int             hostgroups_added;
+    mb_hstgroups_t **local_hostgroups = NULL;
 
     if (json_array_size(json_local_hostgroups) == 0)
         return (MB_OK);
 
     local_hostgroups = (mb_hstgroups_t **)dst;
 
-    if (!(*local_hostgroups = calloc(1, sizeof(mb_hstgroups_t)))) {
+    if (!(*local_hostgroups = mb_json_parse_hostgroups(json_local_hostgroups))) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_hostgroups: error: "
-            "unable to allocate memory");
+            "unable to parse local hostgroups");
         return (MB_NOK);
     }
 
-    TAILQ_INIT(*local_hostgroups);
-
-    hostgroups_added = 0;
-     for (int i = 0; i < (int)json_array_size(json_local_hostgroups); i++) {
-        if (!(hostgroup_pattern = json_string_value(json_array_get(json_local_hostgroups, i)))) {
-            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_hostgroups: error: "
-                "unable to get hostgroup value, skipping");
-            continue;
-        }
-
-        if (!(hostgroup = calloc(1, sizeof(mb_hstgroup_t)))) {
-            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_hostgroups: error: "
-                "unable to allocate memory");
-            goto error;
-        }
-
-        if (!(hostgroup->pattern = strdup(hostgroup_pattern))) {
-            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_hostgroups: error: "
-                "unable to allocate memory");
-            free(hostgroup);
-            goto error;
-        }
-
-        TAILQ_INSERT_TAIL(*local_hostgroups, hostgroup, tq);
-        hostgroups_added++;
-    }
-
-    /* If no hostgroup pattern were successfully added to the list, destroy it */
-    if (hostgroups_added == 0)
-        goto error;
-
     return (MB_OK);
-
-    error:
-    mb_free_local_hostgroups_list(*local_hostgroups);
-    free(*local_hostgroups);
-    return (MB_NOK);
 /* }}} */
 }
 

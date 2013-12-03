@@ -132,7 +132,7 @@ int nebmodule_deinit(int flags __attribute__((__unused__)), int reason __attribu
 
     /* Purge local hostgroups list */
     if (mod_bunny_config.local_hstgroups) {
-        mb_free_local_hostgroups_list(mod_bunny_config.local_hstgroups);
+        mb_free_hostgroups(mod_bunny_config.local_hstgroups);
         free(mod_bunny_config.local_hstgroups);
     }
 
@@ -270,7 +270,7 @@ int mb_handle_event(int event_type, void *event_data) {
             if (mod_bunny_config.local_hstgroups && mb_in_local_hostgroups(hst)) {
                 if (mod_bunny_config.debug)
                     logit(NSLOG_INFO_MESSAGE, TRUE,
-                        "mod_bunny: mb_handle_event: host %s is member of local hostgroups, "
+                        "mod_bunny: mb_handle_event: host [%s] is member of local hostgroups, "
                         "not handling its checks",
                         hstdata->host_name);
 
@@ -297,7 +297,7 @@ int mb_handle_event(int event_type, void *event_data) {
             if (mod_bunny_config.local_svcgroups && mb_in_local_servicegroups(svc)) {
                 if (mod_bunny_config.debug)
                     logit(NSLOG_INFO_MESSAGE, TRUE,
-                        "mod_bunny: mb_handle_event: service %s/%s is member of local servicegroups, "
+                        "mod_bunny: mb_handle_event: service [%s/%s] is member of local servicegroups, "
                         "not handling its checks",
                         svcdata->host_name,
                         svcdata->service_description);
@@ -661,12 +661,6 @@ void mb_free_hostgroups_routing_table(mb_hstgroup_routes_t *hg_routing_table) {
         TAILQ_REMOVE(hg_routing_table, hostgroup_route, tq);
         free(hostgroup_route);
     }
-/* }}} */
-}
-
-void mb_free_local_hostgroups_list(mb_hstgroups_t *hg_list) {
-/* {{{ */
-    mb_free_hostgroups(hg_list);
 /* }}} */
 }
 

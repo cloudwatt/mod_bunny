@@ -127,7 +127,6 @@ typedef struct mb_config_s {
 void    mb_deregister_callbacks(void);
 void    mb_free_hostgroups(mb_hstgroups_t *);
 void    mb_free_hostgroups_routing_table(mb_hstgroup_routes_t *);
-void    mb_free_local_hostgroups_list(mb_hstgroups_t *);
 void    mb_free_local_servicegroups_list(mb_svcgroups_t *);
 int     mb_handle_event(int, void *);
 int     mb_handle_host_check(nebstruct_host_check_data *);
