@@ -326,8 +326,7 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
 
     if (mod_bunny_config.debug)
         logit(NSLOG_INFO_MESSAGE, TRUE,
-            "mod_bunny: mb_handle_host_check: handling host check for %s",
-            hstdata->host_name);
+            "mod_bunny: mb_handle_host_check: handling host check %s", hstdata->host_name);
 
     /*
         Since we intercepted the host check at early stage,
@@ -389,7 +388,7 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
     /* Set the execution flag */
     hst->is_executing = TRUE;
 
-    /* Increment the number of host checks that are currently running  */
+    /* Increment the number of host checks that are currently running */
     currently_running_host_checks++;
 
     free(json_check);
@@ -425,7 +424,7 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
 
     if (mod_bunny_config.debug)
         logit(NSLOG_INFO_MESSAGE, TRUE,
-            "mod_bunny: mb_handle_service_check: handling service check for %s/%s",
+            "mod_bunny: mb_handle_service_check: handling service check %s/%s",
             svcdata->host_name,
             svcdata->service_description);
 
@@ -491,7 +490,7 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     /* Set the execution flag */
     svc->is_executing = TRUE;
 
-    /* Increment the number of service checks that are currently running  */
+    /* Increment the number of service checks that are currently running */
     currently_running_service_checks++;
 
     free(json_check);
