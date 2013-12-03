@@ -123,6 +123,13 @@ int nebmodule_deinit(int flags __attribute__((__unused__)), int reason __attribu
     if (mod_bunny_config.debug)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: nebmodule_deinit: stopped consumer thread");
 
+    /* Purge hostgroups routing table */
+    if (mod_bunny_config.hstgroups_routing_table) {
+        mb_free_hostgroups_routing_table(mod_bunny_config.hstgroups_routing_table);
+        free(mod_bunny_config.hstgroups_routing_table);
+        mod_bunny_config.hstgroups_routing_table = NULL;
+    }
+
     /* Purge local hostgroups list */
     if (mod_bunny_config.local_hstgroups) {
         mb_free_local_hostgroups_list(mod_bunny_config.local_hstgroups);
@@ -321,12 +328,13 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
     char    *raw_command = NULL;
     char    *processed_command = NULL;
     float   prev_latency;
+    char    *routing_key = NULL;
 
     hst = (host *)hstdata->object_ptr;
 
     if (mod_bunny_config.debug)
         logit(NSLOG_INFO_MESSAGE, TRUE,
-            "mod_bunny: mb_handle_host_check: handling host check %s", hstdata->host_name);
+            "mod_bunny: mb_handle_host_check: handling host check for [%s]", hstdata->host_name);
 
     /*
         Since we intercepted the host check at early stage,
@@ -379,7 +387,22 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
         goto error;
     }
 
-    if (!mb_publish_check(json_check, mod_bunny_config.publisher_routing_key)) {
+    /* Get AMQP routing key for this host check */
+    if (mod_bunny_config.hstgroups_routing_table)
+        routing_key = mb_lookup_hostgroups_routing_table(hst);
+
+    /* If no specific routing key defined, use the global routing key */
+    if (!routing_key)
+        routing_key = mod_bunny_config.publisher_routing_key;
+
+    if (mod_bunny_config.debug)
+        logit(NSLOG_INFO_MESSAGE, TRUE,
+            "mod_bunny: mb_handle_host_check: publishing host check [%s] with routing key \"%s\"",
+            hstdata->host_name,
+            routing_key);
+
+    /* Send the JSON-formatted host check message to the broker */
+    if (!mb_publish_check(json_check, routing_key)) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_host_check: error: "
             "could not publish host check message");
         goto error;
@@ -424,7 +447,7 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
 
     if (mod_bunny_config.debug)
         logit(NSLOG_INFO_MESSAGE, TRUE,
-            "mod_bunny: mb_handle_service_check: handling service check %s/%s",
+            "mod_bunny: mb_handle_service_check: handling service check for [%s/%s]",
             svcdata->host_name,
             svcdata->service_description);
 
@@ -552,14 +575,34 @@ void mb_process_check_result(char *msg) {
     if (cr->object_check_type == HOST_CHECK) {
         if (mod_bunny_config.debug)
             logit(NSLOG_INFO_MESSAGE, TRUE,
-                "mod_bunny: mb_process_check_result: processed host check result for %s", cr->host_name);
+                "mod_bunny: mb_process_check_result: processed host check result for [%s]", cr->host_name);
     } else {
         if (mod_bunny_config.debug)
             logit(NSLOG_INFO_MESSAGE, TRUE,
-                "mod_bunny: mb_process_check_result: processed service check result for %s/%s",
+                "mod_bunny: mb_process_check_result: processed service check result for [%s/%s]",
                 cr->host_name,
                 cr->service_description);
     }
+/* }}} */
+}
+
+char *mb_lookup_hostgroups_routing_table(host *hst) {
+/* {{{ */
+    objectlist          *obj = NULL;
+    mb_hstgroup_route_t *hstgroup_route = NULL;
+    mb_hstgroup_t       *hstgroup = NULL;
+
+    for (obj = hst->hostgroups_ptr; obj != NULL; obj = obj->next) {
+        TAILQ_FOREACH(hstgroup_route, mod_bunny_config.hstgroups_routing_table, tq) {
+            TAILQ_FOREACH(hstgroup, hstgroup_route->hstgroups, tq) {
+                if ((fnmatch(hstgroup->pattern, ((hostgroup *)obj->object_ptr)->group_name, 0) == 0)) {
+                    return (hstgroup_route->routing_key);
+                }
+            }
+        }
+    }
+
+    return (NULL);
 /* }}} */
 }
 
@@ -597,15 +640,33 @@ int mb_in_local_servicegroups(service *svc) {
 /* }}} */
 }
 
-void mb_free_local_hostgroups_list(mb_hstgroups_t *hg_list) {
+void mb_free_hostgroups(mb_hstgroups_t *hostgroups) {
 /* {{{ */
     mb_hstgroup_t *hostgroup = NULL;
 
-    while ((hostgroup = TAILQ_FIRST(hg_list))) {
-        TAILQ_REMOVE(hg_list, hostgroup, tq);
+    while ((hostgroup = TAILQ_FIRST(hostgroups))) {
+        TAILQ_REMOVE(hostgroups, hostgroup, tq);
         free(hostgroup->pattern);
         free(hostgroup);
     }
+/* }}} */
+}
+
+void mb_free_hostgroups_routing_table(mb_hstgroup_routes_t *hg_routing_table) {
+/* {{{ */
+    mb_hstgroup_route_t *hostgroup_route = NULL;
+
+    while ((hostgroup_route = TAILQ_FIRST(hg_routing_table))) {
+        mb_free_hostgroups(hostgroup_route->hstgroups);
+        TAILQ_REMOVE(hg_routing_table, hostgroup_route, tq);
+        free(hostgroup_route);
+    }
+/* }}} */
+}
+
+void mb_free_local_hostgroups_list(mb_hstgroups_t *hg_list) {
+/* {{{ */
+    mb_free_hostgroups(hg_list);
 /* }}} */
 }
 

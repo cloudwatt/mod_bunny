@@ -77,6 +77,12 @@ static inline bool mb_json_is_array(json_t *obj) {
 /* }}} */
 }
 
+static inline bool mb_json_is_object(json_t *obj) {
+/* {{{ */
+    return json_is_object(obj);
+/* }}} */
+}
+
 static inline int mb_json_parse_string(json_t *json_obj, void *dst, int (*check)(void *)) {
 /* {{{ */
     const char *tmp_str = NULL;
@@ -115,6 +121,119 @@ static inline int mb_json_parse_bool(json_t *json_obj, void *dst,
     *(bool *)dst = (json_is_true(json_obj) ? true : false);
 
     return (MB_OK);
+/* }}} */
+}
+
+static inline mb_hstgroups_t *mb_json_parse_hostgroups(json_t *json_hostgroups) {
+/* {{{ */
+    mb_hstgroups_t  *hostgroups = NULL;
+    mb_hstgroup_t   *hostgroup = NULL;
+    const char      *hostgroup_pattern = NULL;
+    int             hostgroups_added = 0;
+
+    if (json_array_size(json_hostgroups) == 0)
+        return (NULL);
+
+    if (!(hostgroups = calloc(1, sizeof(mb_hstgroups_t)))) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_hostgroup_list: error: "
+            "unable to allocate memory");
+        return (NULL);
+    }
+
+    TAILQ_INIT(hostgroups);
+
+     for (int i = 0; i < (int)json_array_size(json_hostgroups); i++) {
+        if (!(hostgroup_pattern = json_string_value(json_array_get(json_hostgroups, i)))) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_hostgroup_list: error: "
+                "unable to get hostgroup value, skipping");
+            continue;
+        }
+
+        if (!(hostgroup = calloc(1, sizeof(mb_hstgroup_t)))) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_hostgroup_list: error: "
+                "unable to allocate memory");
+            goto error;
+        }
+
+        if (!(hostgroup->pattern = strdup(hostgroup_pattern))) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_hostgroup_list: error: "
+                "unable to allocate memory");
+            free(hostgroup);
+            goto error;
+        }
+
+        TAILQ_INSERT_TAIL(hostgroups, hostgroup, tq);
+        hostgroups_added++;
+    }
+
+    /* If no hostgroup pattern were successfully added to the list, destroy it */
+    if (hostgroups_added == 0)
+        goto error;
+
+    return (hostgroups);
+
+    error:
+    mb_free_local_hostgroups_list(hostgroups);
+    free(hostgroups);
+    return (NULL);
+/* }}} */
+}
+
+static inline int mb_json_parse_hostgroups_routing_table(json_t *json_hostgroups_routing_table, void *dst,
+    int (*check)(void *) __attribute__((__unused__))) {
+/* {{{ */
+    mb_hstgroup_routes_t    **hostgroups_routing_table = NULL;
+    mb_hstgroup_route_t     *hostgroup_route = NULL;
+    const char              *routing_key = NULL;
+    json_t                  *json_hostgroups = NULL;
+    int                     hostgroups_routes_added = 0;
+
+    if (json_object_size(json_hostgroups_routing_table) == 0)
+        return (MB_OK);
+
+    hostgroups_routing_table = (mb_hstgroup_routes_t **)dst;
+
+    if (!(*hostgroups_routing_table = calloc(1, sizeof(mb_hstgroup_routes_t)))) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_hostgroups_routing_table: error: "
+            "unable to allocate memory");
+        return (MB_NOK);
+    }
+
+    TAILQ_INIT(*hostgroups_routing_table);
+
+    json_object_foreach(json_hostgroups_routing_table, routing_key, json_hostgroups) {
+        if (!(hostgroup_route = calloc(1, sizeof(mb_hstgroup_route_t)))) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_hostgroups_routing_table: error: "
+                "unable to allocate memory");
+            goto error;
+        }
+
+        strncpy(hostgroup_route->routing_key, routing_key, MB_BUF_LEN - 1);
+
+        /* If hostgroups array is empty, discard this route and skip to the next */
+        if (json_array_size(json_hostgroups) == 0) {
+            free(hostgroup_route);
+            continue;
+        }
+
+        if (!(hostgroup_route->hstgroups = mb_json_parse_hostgroups(json_hostgroups))) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_hostgroups_routing_table: error: "
+                "unable to parse hostgroups for routing key \"%s\"", routing_key);
+            goto error;
+        }
+
+        TAILQ_INSERT_TAIL(*hostgroups_routing_table, hostgroup_route, tq);
+        hostgroups_routes_added++;
+    }
+
+    return (MB_OK);
+
+    error:
+    mb_free_hostgroups_routing_table(*hostgroups_routing_table);
+    free(*hostgroups_routing_table);
+    *hostgroups_routing_table = NULL;
+
+    return (MB_NOK);
 /* }}} */
 }
 
@@ -267,6 +386,8 @@ int mb_json_parse_config(char *file, mb_config_t *mb_config) {
             mb_json_parse_string, NULL },
         { "consumer_binding_key", mb_config->consumer_binding_key, mb_json_is_string,
             mb_json_parse_string, NULL },
+        { "hostgroups_routing_table", &mb_config->hstgroups_routing_table, mb_json_is_object,
+            mb_json_parse_hostgroups_routing_table, NULL },
         { "local_hostgroups", &mb_config->local_hstgroups, mb_json_is_array,
             mb_json_parse_local_hostgroups, NULL },
         { "local_servicegroups", &mb_config->local_svcgroups, mb_json_is_array,
