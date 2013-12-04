@@ -130,6 +130,13 @@ int nebmodule_deinit(int flags __attribute__((__unused__)), int reason __attribu
         mod_bunny_config.hstgroups_routing_table = NULL;
     }
 
+    /* Purge servicegroups routing table */
+    if (mod_bunny_config.svcgroups_routing_table) {
+        mb_free_servicegroups_routing_table(mod_bunny_config.svcgroups_routing_table);
+        free(mod_bunny_config.svcgroups_routing_table);
+        mod_bunny_config.svcgroups_routing_table = NULL;
+    }
+
     /* Purge local hostgroups list */
     if (mod_bunny_config.local_hstgroups) {
         mb_free_hostgroups(mod_bunny_config.local_hstgroups);
@@ -138,7 +145,7 @@ int nebmodule_deinit(int flags __attribute__((__unused__)), int reason __attribu
 
     /* Purge local servicegroups list */
     if (mod_bunny_config.local_svcgroups) {
-        mb_free_local_servicegroups_list(mod_bunny_config.local_svcgroups);
+        mb_free_servicegroups(mod_bunny_config.local_svcgroups);
         free(mod_bunny_config.local_svcgroups);
     }
 
@@ -444,6 +451,7 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     char    *raw_command = NULL;
     char    *processed_command = NULL;
     float   prev_latency;
+    char    *routing_key = NULL;
 
     if (mod_bunny_config.debug)
         logit(NSLOG_INFO_MESSAGE, TRUE,
@@ -503,8 +511,23 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
         goto error;
     }
 
+    /* Get AMQP routing key for this service check */
+    if (mod_bunny_config.svcgroups_routing_table)
+        routing_key = mb_lookup_servicegroups_routing_table(svc);
+
+    /* If no specific routing key defined, use the global routing key */
+    if (!routing_key)
+        routing_key = mod_bunny_config.publisher_routing_key;
+
+    if (mod_bunny_config.debug)
+        logit(NSLOG_INFO_MESSAGE, TRUE,
+            "mod_bunny: mb_handle_service_check: publishing service check [%s/%s] with routing key \"%s\"",
+            svcdata->host_name,
+            svcdata->service_description,
+            routing_key);
+
     /* Publish the service check through the AMQP broker */
-    if (!mb_publish_check(json_check, mod_bunny_config.publisher_routing_key)) {
+    if (!mb_publish_check(json_check, routing_key)) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_service_check: error: "
             "could not publish service check message");
         goto error;
@@ -606,6 +629,26 @@ char *mb_lookup_hostgroups_routing_table(host *hst) {
 /* }}} */
 }
 
+char *mb_lookup_servicegroups_routing_table(service *svc) {
+/* {{{ */
+    objectlist          *obj = NULL;
+    mb_svcgroup_route_t *svcgroup_route = NULL;
+    mb_svcgroup_t       *svcgroup = NULL;
+
+    for (obj = svc->servicegroups_ptr; obj != NULL; obj = obj->next) {
+        TAILQ_FOREACH(svcgroup_route, mod_bunny_config.svcgroups_routing_table, tq) {
+            TAILQ_FOREACH(svcgroup, svcgroup_route->svcgroups, tq) {
+                if ((fnmatch(svcgroup->pattern, ((servicegroup *)obj->object_ptr)->group_name, 0) == 0)) {
+                    return (svcgroup_route->routing_key);
+                }
+            }
+        }
+    }
+
+    return (NULL);
+/* }}} */
+}
+
 int mb_in_local_hostgroups(host *hst) {
 /* {{{ */
     objectlist      *obj = NULL;
@@ -664,14 +707,26 @@ void mb_free_hostgroups_routing_table(mb_hstgroup_routes_t *hg_routing_table) {
 /* }}} */
 }
 
-void mb_free_local_servicegroups_list(mb_svcgroups_t *sg_list) {
+void mb_free_servicegroups(mb_svcgroups_t *servicegroups) {
 /* {{{ */
     mb_svcgroup_t *servicegroup = NULL;
 
-    while ((servicegroup = TAILQ_FIRST(sg_list))) {
-        TAILQ_REMOVE(sg_list, servicegroup, tq);
+    while ((servicegroup = TAILQ_FIRST(servicegroups))) {
+        TAILQ_REMOVE(servicegroups, servicegroup, tq);
         free(servicegroup->pattern);
         free(servicegroup);
+    }
+/* }}} */
+}
+
+void mb_free_servicegroups_routing_table(mb_svcgroup_routes_t *sg_routing_table) {
+/* {{{ */
+    mb_svcgroup_route_t *servicegroup_route = NULL;
+
+    while ((servicegroup_route = TAILQ_FIRST(sg_routing_table))) {
+        mb_free_servicegroups(servicegroup_route->svcgroups);
+        TAILQ_REMOVE(sg_routing_table, servicegroup_route, tq);
+        free(servicegroup_route);
     }
 /* }}} */
 }

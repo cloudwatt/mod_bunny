@@ -92,11 +92,19 @@ typedef struct mb_hstgroup_route_s {
     TAILQ_ENTRY(mb_hstgroup_route_s) tq;
 } mb_hstgroup_route_t;
 
+typedef TAILQ_HEAD(mb_svcgroup_routes_s, mb_svcgroup_route_s) mb_svcgroup_routes_t;
+typedef struct mb_svcgroup_route_s {
+    char            routing_key[MB_BUF_LEN];
+    mb_svcgroups_t  *svcgroups;
+    TAILQ_ENTRY(mb_svcgroup_route_s) tq;
+} mb_svcgroup_route_t;
+
 typedef struct mb_config_s {
 /* {{{ */
     bool                    debug;
     int                     retry_wait_time;
     mb_hstgroup_routes_t    *hstgroups_routing_table;
+    mb_svcgroup_routes_t    *svcgroups_routing_table;
     mb_hstgroups_t          *local_hstgroups;
     mb_svcgroups_t          *local_svcgroups;
 
@@ -127,7 +135,8 @@ typedef struct mb_config_s {
 void    mb_deregister_callbacks(void);
 void    mb_free_hostgroups(mb_hstgroups_t *);
 void    mb_free_hostgroups_routing_table(mb_hstgroup_routes_t *);
-void    mb_free_local_servicegroups_list(mb_svcgroups_t *);
+void    mb_free_servicegroups(mb_svcgroups_t *);
+void    mb_free_servicegroups_routing_table(mb_svcgroup_routes_t *);
 int     mb_handle_event(int, void *);
 int     mb_handle_host_check(nebstruct_host_check_data *);
 int     mb_handle_service_check(nebstruct_service_check_data *);
@@ -136,6 +145,7 @@ int     mb_in_local_servicegroups(service *);
 int     mb_init(int, void *);
 int     mb_init_config();
 char    *mb_lookup_hostgroups_routing_table(host *);
+char    *mb_lookup_servicegroups_routing_table(service *);
 void    mb_register_callbacks(void);
 void    mb_process_check_result(char *);
 int     mb_publish_check(char *, char *);

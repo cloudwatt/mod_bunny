@@ -254,49 +254,42 @@ static inline int mb_json_parse_local_hostgroups(json_t *json_local_hostgroups, 
 /* }}} */
 }
 
-static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegroups, void *dst,
-    int (*check)(void *) __attribute__((__unused__))) {
+static inline mb_svcgroups_t *mb_json_parse_servicegroups(json_t *json_servicegroups) {
 /* {{{ */
-    mb_svcgroups_t  **local_servicegroups = NULL;
+    mb_svcgroups_t  *servicegroups = NULL;
     mb_svcgroup_t   *servicegroup = NULL;
     const char      *servicegroup_pattern = NULL;
-    int             servicegroups_added;
+    int             servicegroups_added = 0;
 
-    if (json_array_size(json_local_servicegroups) == 0)
-        return (MB_OK);
-
-    local_servicegroups = (mb_svcgroups_t **)dst;
-
-    if (!(*local_servicegroups = calloc(1, sizeof(mb_svcgroups_t)))) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_servicegroups: error: "
+    if (!(servicegroups = calloc(1, sizeof(mb_svcgroups_t)))) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_servicegroup_list: error: "
             "unable to allocate memory");
-        return (MB_NOK);
+        return (NULL);
     }
 
-    TAILQ_INIT(*local_servicegroups);
+    TAILQ_INIT(servicegroups);
 
-    servicegroups_added = 0;
-     for (int i = 0; i < (int)json_array_size(json_local_servicegroups); i++) {
-        if (!(servicegroup_pattern = json_string_value(json_array_get(json_local_servicegroups, i)))) {
-            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_servicegroups: error: "
+     for (int i = 0; i < (int)json_array_size(json_servicegroups); i++) {
+        if (!(servicegroup_pattern = json_string_value(json_array_get(json_servicegroups, i)))) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_servicegroup_list: error: "
                 "unable to get servicegroup value, skipping");
             continue;
         }
 
         if (!(servicegroup = calloc(1, sizeof(mb_svcgroup_t)))) {
-            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_servicegroups: error: "
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_servicegroup_list: error: "
                 "unable to allocate memory");
             goto error;
         }
 
         if (!(servicegroup->pattern = strdup(servicegroup_pattern))) {
-            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_servicegroups: error: "
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_servicegroup_list: error: "
                 "unable to allocate memory");
             free(servicegroup);
             goto error;
         }
 
-        TAILQ_INSERT_TAIL(*local_servicegroups, servicegroup, tq);
+        TAILQ_INSERT_TAIL(servicegroups, servicegroup, tq);
         servicegroups_added++;
     }
 
@@ -304,12 +297,90 @@ static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegr
     if (servicegroups_added == 0)
         goto error;
 
+    return (servicegroups);
+
+    error:
+    mb_free_servicegroups(servicegroups);
+    free(servicegroups);
+    return (NULL);
+/* }}} */
+}
+
+static inline int mb_json_parse_servicegroups_routing_table(json_t *json_servicegroups_routing_table, void *dst,
+    int (*check)(void *) __attribute__((__unused__))) {
+/* {{{ */
+    mb_svcgroup_routes_t    **servicegroups_routing_table = NULL;
+    mb_svcgroup_route_t     *servicegroup_route = NULL;
+    const char              *routing_key = NULL;
+    json_t                  *json_servicegroups = NULL;
+    int                     servicegroups_routes_added = 0;
+
+    if (json_object_size(json_servicegroups_routing_table) == 0)
+        return (MB_OK);
+
+    servicegroups_routing_table = (mb_svcgroup_routes_t **)dst;
+
+    if (!(*servicegroups_routing_table = calloc(1, sizeof(mb_svcgroup_routes_t)))) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_servicegroups_routing_table: error: "
+            "unable to allocate memory");
+        return (MB_NOK);
+    }
+
+    TAILQ_INIT(*servicegroups_routing_table);
+
+    json_object_foreach(json_servicegroups_routing_table, routing_key, json_servicegroups) {
+        if (!(servicegroup_route = calloc(1, sizeof(mb_svcgroup_route_t)))) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_servicegroups_routing_table: error: "
+                "unable to allocate memory");
+            goto error;
+        }
+
+        strncpy(servicegroup_route->routing_key, routing_key, MB_BUF_LEN - 1);
+
+        /* If servicegroups array is empty, discard this route and skip to the next */
+        if (json_array_size(json_servicegroups) == 0) {
+            free(servicegroup_route);
+            continue;
+        }
+
+        if (!(servicegroup_route->svcgroups = mb_json_parse_servicegroups(json_servicegroups))) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_servicegroups_routing_table: error: "
+                "unable to parse servicegroups for routing key \"%s\"", routing_key);
+            goto error;
+        }
+
+        TAILQ_INSERT_TAIL(*servicegroups_routing_table, servicegroup_route, tq);
+        servicegroups_routes_added++;
+    }
+
     return (MB_OK);
 
     error:
-    mb_free_local_servicegroups_list(*local_servicegroups);
-    free(*local_servicegroups);
+    mb_free_servicegroups_routing_table(*servicegroups_routing_table);
+    free(*servicegroups_routing_table);
+    *servicegroups_routing_table = NULL;
+
     return (MB_NOK);
+/* }}} */
+}
+
+static inline int mb_json_parse_local_servicegroups(json_t *json_local_servicegroups, void *dst,
+    int (*check)(void *) __attribute__((__unused__))) {
+/* {{{ */
+    mb_svcgroups_t **local_servicegroups = NULL;
+
+    if (json_array_size(json_local_servicegroups) == 0)
+        return (MB_OK);
+
+    local_servicegroups = (mb_svcgroups_t **)dst;
+
+    if (!(*local_servicegroups = mb_json_parse_servicegroups(json_local_servicegroups))) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_local_servicegroups: error: "
+            "unable to parse local servicegroups");
+        return (MB_NOK);
+    }
+
+    return (MB_OK);
 /* }}} */
 }
 
@@ -346,6 +417,8 @@ int mb_json_parse_config(char *file, mb_config_t *mb_config) {
             mb_json_parse_string, NULL },
         { "hostgroups_routing_table", &mb_config->hstgroups_routing_table, mb_json_is_object,
             mb_json_parse_hostgroups_routing_table, NULL },
+        { "servicegroups_routing_table", &mb_config->svcgroups_routing_table, mb_json_is_object,
+            mb_json_parse_servicegroups_routing_table, NULL },
         { "local_hostgroups", &mb_config->local_hstgroups, mb_json_is_array,
             mb_json_parse_local_hostgroups, NULL },
         { "local_servicegroups", &mb_config->local_svcgroups, mb_json_is_array,
