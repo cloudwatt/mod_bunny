@@ -51,6 +51,8 @@ The configuration file is using JSON format. Here are the supported settings and
 * `"consumer_binding_key": "nagios_results"` Binding key to use to consume check result messages
 * `"local_hostgroups": []` Hostgroups** for which __mod_bunny__ won't override checks (Nagios-local checks)
 * `"local_servicegroups": []` Servicegroups** for which __mod_bunny__ won't override checks (Nagios-local checks)
+* `"hostgroups_routing_table": {}` Mapping of AMQP routing keys/hostgroups to use for dispatching host checks
+* `"servicegroups_routing_table": {}` Mapping of AMQP routing keys/servicegroups to use for dispatching service checks
 * `"retry_wait_time": 3` Time to wait (in seconds) before trying to reconnect to the broker
 * `"debug": false` Debugging flag (useful for troubleshooting error)
 
@@ -67,6 +69,25 @@ Basic configuration example:
   "password": "S3curEP4$$w0rd!"
 }
 ```
+
+Hostgroups/servicegroups routing table are useful for executing host/service checks by specific bunny workers:
+
+```
+{
+  ...
+
+  "hostgroups_routing_table": {
+    "nagios_checks_oob": [ "oob", "net-*" ]
+  },
+
+  "servicegroups_routing_table": {
+    "nagios_checks_www": [ "www" ],
+    "nagios_checks_db": [ "mysql", "oracle", "postgresql" ]
+  }
+}
+```
+
+In the configuration example above, all checks for hosts members of the hostgroup _oob_ and all hostgroups matching the "net-*" wildcard will be published with the routing key "nagios_checks_oob": this way, only bunny workers bound to a queue matching this key will receive the checks. Similarily, all checks for services members of the servicegroup _www_ will be executed by bunny workers bound to a queue matching the routing key "nagios_checks_www". All others host/checks will be published with the routing key defined by the `publisher_routing_key` setting.
 
 Compatibility
 -------------
