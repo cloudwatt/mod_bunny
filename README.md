@@ -9,7 +9,7 @@ Requirements
 **mod_bunny** relies on the following software:
 
 * RabbitMQ C AMQP client [library](http://github.com/alanxz/rabbitmq-c) (<= 0.3.0)
-* Jansson C JSON [library](http://www.digip.org/jansson/) (>= 2.2)
+* Jansson C JSON [library](http://www.digip.org/jansson/) (>= 2.3)
 
 Installation
 ------------
