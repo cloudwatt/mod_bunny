@@ -51,7 +51,7 @@
 #include "nebstructs.h"
 #include "neberrors.h"
 
-#define MB_VERSION                          "0.1.0"
+#define MB_VERSION                          "0.3.0"
 #define MB_OK                               1
 #define MB_NOK                              0
 #define MB_BUF_LEN                          1024
