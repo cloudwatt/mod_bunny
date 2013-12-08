@@ -90,16 +90,20 @@ typedef struct mb_svcgroup_s {
 
 typedef TAILQ_HEAD(mb_hstgroup_routes_s, mb_hstgroup_route_s) mb_hstgroup_routes_t;
 typedef struct mb_hstgroup_route_s {
+/* {{{ */
     char            routing_key[MB_BUF_LEN];
     mb_hstgroups_t  *hstgroups;
     TAILQ_ENTRY(mb_hstgroup_route_s) tq;
+/* }}} */
 } mb_hstgroup_route_t;
 
 typedef TAILQ_HEAD(mb_svcgroup_routes_s, mb_svcgroup_route_s) mb_svcgroup_routes_t;
 typedef struct mb_svcgroup_route_s {
+/* {{{ */
     char            routing_key[MB_BUF_LEN];
     mb_svcgroups_t  *svcgroups;
     TAILQ_ENTRY(mb_svcgroup_route_s) tq;
+/* }}} */
 } mb_svcgroup_route_t;
 
 typedef struct mb_config_s {
