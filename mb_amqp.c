@@ -42,6 +42,8 @@ static char *mb_amqp_bytes_to_cstring(amqp_bytes_t *ab) {
 
 static int mb_amqp_error(amqp_rpc_reply_t reply, const char *context) {
 /* {{{ */
+    const char *error_str = NULL;
+
     switch (reply.reply_type) {
     case AMQP_RESPONSE_NORMAL:
         return (MB_OK);
@@ -53,9 +55,18 @@ static int mb_amqp_error(amqp_rpc_reply_t reply, const char *context) {
         return (MB_NOK);
 
     case AMQP_RESPONSE_LIBRARY_EXCEPTION:
+/* amqp_error_string() is deprecated since librabbitmq > 0.4.0 */
+#ifdef LIBRABBITMQ_LEGACY
+        error_str = amqp_error_string(reply.library_error);
+#else
+        error_str = amqp_error_string2(reply.library_error);
+#endif
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: error: %s",
             context,
-            amqp_error_string(reply.library_error));
+            error_str);
+#ifdef LIBRABBITMQ_LEGACY
+        free((char *)error_str);
+#endif
         return (MB_NOK);
 
     case AMQP_RESPONSE_SERVER_EXCEPTION: {
@@ -102,6 +113,8 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
             amqp_conn->port,
             amqp_conn->vhost);
 
+/* amqp_open_socket() is deprecated since librabbitmq > 0.4.0 */
+#ifdef LIBRABBITMQ_LEGACY
     if ((*amqp_conn->sockfd = amqp_open_socket(amqp_conn->host, amqp_conn->port)) < 0) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: error: %s",
             context,
@@ -110,10 +123,28 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
         return (MB_NOK);
     }
 
+    amqp_set_sockfd(*amqp_conn->conn, *amqp_conn->sockfd);
+#else
+    if (!(amqp_conn->socket = amqp_tcp_socket_new(*amqp_conn->conn))) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: error: %s",
+            context,
+            "amqp_tcp_socket_new() failed");
+        amqp_destroy_connection(*amqp_conn->conn);
+        return (MB_NOK);
+    }
+
+    if (amqp_socket_open(amqp_conn->socket, amqp_conn->host, amqp_conn->port) != AMQP_STATUS_OK) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: error: %s",
+            context,
+            "amqp_socket_open() failed");
+        amqp_destroy_connection(*amqp_conn->conn);
+        return (MB_NOK);
+    }
+#endif
+
     if (amqp_conn->debug)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: successfully connected to broker", context);
 
-    amqp_set_sockfd(*amqp_conn->conn, *amqp_conn->sockfd);
 
     if (mb_amqp_error(amqp_login(*amqp_conn->conn,  /* connection */
         amqp_conn->vhost,                           /* vhost */
@@ -169,7 +200,9 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
     return (MB_OK);
 
     error:
+#ifdef LIBRABBITMQ_LEGACY
     close(*amqp_conn->sockfd);
+#endif
     amqp_destroy_connection(*amqp_conn->conn);
 
     return (MB_NOK);
@@ -204,7 +237,9 @@ static int mb_amqp_disconnect(mb_amqp_connection_t *amqp_conn, const char *conte
     return (MB_OK);
 
     error:
+#ifdef LIBRABBITMQ_LEGACY
     close(*amqp_conn->sockfd);
+#endif
     amqp_destroy_connection(*amqp_conn->conn);
 
     return (MB_NOK);
@@ -303,7 +338,11 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
 
     mb_amqp_connection_t conn = {
         .conn           = &config->consumer_amqp_conn,
+#ifdef LIBRABBITMQ_LEGACY
         .sockfd         = &config->consumer_amqp_sockfd,
+#else
+        .socket         = config->consumer_amqp_socket,
+#endif
         .host           = config->host,
         .port           = config->port,
         .vhost          = config->vhost,
@@ -386,7 +425,9 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
 
     error:
     free(declared_queue);
+#ifdef LIBRABBITMQ_LEGACY
     close(config->consumer_amqp_sockfd);
+#endif
     amqp_destroy_connection(config->consumer_amqp_conn);
 
     return (MB_NOK);
@@ -397,7 +438,11 @@ int mb_amqp_connect_publisher(mb_config_t *config) {
 /* {{{ */
     mb_amqp_connection_t conn = {
         .conn           = &config->publisher_amqp_conn,
+#ifdef LIBRABBITMQ_LEGACY
         .sockfd         = &config->publisher_amqp_sockfd,
+#else
+        .socket         = config->publisher_amqp_socket,
+#endif
         .host           = config->host,
         .port           = config->port,
         .vhost          = config->vhost,
@@ -420,7 +465,11 @@ int mb_amqp_disconnect_consumer(mb_config_t *config) {
 /* {{{ */
     mb_amqp_connection_t conn = {
         .conn           = &config->consumer_amqp_conn,
+#ifdef LIBRABBITMQ_LEGACY
         .sockfd         = &config->consumer_amqp_sockfd,
+#else
+        .socket         = config->consumer_amqp_socket,
+#endif
         .host           = config->host,
         .port           = config->port,
         .vhost          = config->vhost,
@@ -445,7 +494,11 @@ int mb_amqp_disconnect_publisher(mb_config_t *config) {
 /* {{{ */
     mb_amqp_connection_t conn = {
         .conn           = &config->publisher_amqp_conn,
+#ifdef LIBRABBITMQ_LEGACY
         .sockfd         = &config->publisher_amqp_sockfd,
+#else
+        .socket         = config->publisher_amqp_socket,
+#endif
         .host           = config->host,
         .port           = config->port,
         .vhost          = config->vhost,

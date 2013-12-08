@@ -23,10 +23,6 @@
 #ifndef _MOD_BUNNY_H_
 #define _MOD_BUNNY_H_
 
-#ifndef NSCORE
-#define NSCORE
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -37,10 +33,17 @@
 #include <pthread.h>
 #include <sys/queue.h>
 #include <fnmatch.h>
+
 #include <amqp.h>
 #include <amqp_framing.h>
+#ifndef AMQP_VERSION
+#define LIBRABBITMQ_LEGACY
+#else
+#include <amqp_tcp_socket.h>
+#endif
 
 /* Nagios-related headers */
+#define NSCORE
 #include "nagios.h"
 #include "macros.h"
 #include "broker.h"
@@ -115,14 +118,22 @@ typedef struct mb_config_s {
     char                    password[MB_BUF_LEN];
 
     amqp_connection_state_t publisher_amqp_conn;
+#ifdef LIBRABBITMQ_LEGACY
     int                     publisher_amqp_sockfd;
+#else
+    amqp_socket_t           *publisher_amqp_socket;
+#endif
     char                    publisher_exchange[MB_BUF_LEN];
     char                    publisher_routing_key[MB_BUF_LEN];
     char                    publisher_exchange_type[MB_BUF_LEN];
     bool                    publisher_connected;
 
     amqp_connection_state_t consumer_amqp_conn;
+#ifdef LIBRABBITMQ_LEGACY
     int                     consumer_amqp_sockfd;
+#else
+    amqp_socket_t           *consumer_amqp_socket;
+#endif
     char                    consumer_exchange[MB_BUF_LEN];
     char                    consumer_exchange_type[MB_BUF_LEN];
     char                    consumer_queue[MB_BUF_LEN];

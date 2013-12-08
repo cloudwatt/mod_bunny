@@ -30,7 +30,11 @@
 typedef struct mb_amqp_connection {
 /* {{{ */
     amqp_connection_state_t *conn;
+#ifdef LIBRABBITMQ_LEGACY
     int                     *sockfd;
+#else
+    amqp_socket_t           *socket;
+#endif
     char                    *host;
     int                     port;
     char                    *vhost;
