@@ -23,6 +23,10 @@
 #ifndef _MOD_BUNNY_H_
 #define _MOD_BUNNY_H_
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -43,6 +47,7 @@
 #endif
 
 /* Nagios-related headers */
+#undef _GNU_SOURCE /* Will be re-defined in nagios/include/config.h */
 #define NSCORE
 #include "nagios.h"
 #include "macros.h"
@@ -161,6 +166,7 @@ int     mb_init(int, void *);
 int     mb_init_config();
 char    *mb_lookup_hostgroups_routing_table(host *);
 char    *mb_lookup_servicegroups_routing_table(service *);
+void    mb_mark_check_orphaned(char *, char *);
 void    mb_register_callbacks(void);
 void    mb_process_check_result(char *);
 int     mb_publish_check(char *, char *);

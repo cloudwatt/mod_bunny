@@ -278,10 +278,24 @@ int mb_handle_event(int event_type, void *event_data) {
                 if (mod_bunny_config.debug)
                     logit(NSLOG_INFO_MESSAGE, TRUE,
                         "mod_bunny: mb_handle_event: host [%s] is member of local hostgroups, "
-                        "not handling its checks",
+                        "not handling its check",
                         hstdata->host_name);
 
                 return (NEB_OK);
+            }
+
+            /*
+                If this check is marked as "orphaned" by Nagios, fake a check result to
+                notify users since something might be wrong on the worker side
+            */
+            if (((host *)hstdata->object_ptr)->check_options & CHECK_OPTION_ORPHAN_CHECK) {
+                if (mod_bunny_config.debug)
+                    logit(NSLOG_INFO_MESSAGE, TRUE,
+                        "mod_bunny: mb_handle_event: host check for [%s] has been flagged as orphaned",
+                        hstdata->host_name);
+
+                mb_mark_check_orphaned(hstdata->host_name, NULL);
+                return (NEBERROR_CALLBACKOVERRIDE);
             }
 
             /* If we can't handle host check, tell Nagios to reschedule it later */
@@ -305,11 +319,26 @@ int mb_handle_event(int event_type, void *event_data) {
                 if (mod_bunny_config.debug)
                     logit(NSLOG_INFO_MESSAGE, TRUE,
                         "mod_bunny: mb_handle_event: service [%s/%s] is member of local servicegroups, "
-                        "not handling its checks",
+                        "not handling its check",
                         svcdata->host_name,
                         svcdata->service_description);
 
                 return (NEB_OK);
+            }
+
+            /*
+                If this check is marked as "orphaned" by Nagios, fake a check result to
+                notify users since something might be wrong on the worker side
+            */
+            if (((service *)svcdata->object_ptr)->check_options & CHECK_OPTION_ORPHAN_CHECK) {
+                if (mod_bunny_config.debug)
+                    logit(NSLOG_INFO_MESSAGE, TRUE,
+                        "mod_bunny: mb_handle_event: service check for [%s/%s] has been flagged as orphaned",
+                        svcdata->host_name,
+                        svcdata->service_description);
+
+                mb_mark_check_orphaned(svcdata->host_name, svcdata->service_description);
+                return (NEBERROR_CALLBACKOVERRIDE);
             }
 
             /* If we can't handle service check, tell Nagios to reschedule it later */
@@ -606,6 +635,64 @@ void mb_process_check_result(char *msg) {
                 cr->host_name,
                 cr->service_description);
     }
+/* }}} */
+}
+
+void mb_mark_check_orphaned(char *host, char *service) {
+/* {{{ */
+    check_result *cr = NULL;
+
+    if (!(cr = (check_result *)calloc(1, sizeof(check_result)))) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_mark_check_orphaned: error: "
+        "unable to allocate memory");
+        return;
+    }
+
+    init_check_result(cr);
+
+    cr->scheduled_check = TRUE;
+    cr->reschedule_check = TRUE;
+    cr->exited_ok = TRUE;
+    cr->early_timeout = FALSE;
+    cr->output = strdup("[mod_bunny] error: check is orphaned (no workers running?)");
+    cr->output_file = NULL;
+    cr->output_file_fp = NULL;
+    cr->check_options = CHECK_OPTION_NONE;
+    cr->start_time.tv_sec = (unsigned long)time(NULL);
+    cr->finish_time.tv_sec = (unsigned long)time(NULL);
+    cr->latency = 0;
+
+    if (!host) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_mark_check_orphaned: error: "
+        "host name unspecified");
+        goto error;
+    } else
+        cr->host_name = strdup(host);
+
+    if (service) {
+        cr->object_check_type = SERVICE_CHECK;
+        cr->check_type = SERVICE_CHECK_ACTIVE;
+        cr->return_code = STATE_CRITICAL;
+        cr->service_description = strdup(service);
+    } else {
+        cr->object_check_type = HOST_CHECK;
+        cr->check_type = HOST_CHECK_ACTIVE;
+        cr->return_code = HOST_UNREACHABLE;
+    }
+
+#if NAGIOS_3_5_X
+    add_check_result_to_list(&check_result_list, cr);
+#else
+    add_check_result_to_list(cr);
+#endif
+
+    return;
+
+    error:
+    if (cr->output)
+        free(cr->output);
+    free(cr);
+    return;
 /* }}} */
 }
 
