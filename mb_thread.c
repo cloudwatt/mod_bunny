@@ -27,18 +27,18 @@ static void mb_thread_publish_shutdown(void *args) {
 /* {{{ */
     mb_config_t *mb_config = (mb_config_t *)args;
 
-    if (mb_config->debug)
+    if (mb_config->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_thread_publish: received shutdown signal");
 
     if (mb_config->publisher_connected) {
         if (mb_amqp_disconnect_publisher(mb_config)) {
-            if (mb_config->debug)
+            if (mb_config->debug_level > 0)
                 logit(NSLOG_INFO_MESSAGE, TRUE,
                     "mod_bunny: mb_thread_publish: successfully closed connection to AMQP broker");
         }
     }
 
-    if (mb_config->debug)
+    if (mb_config->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_thread_publish: terminating");
 } /* }}} */
 
@@ -46,18 +46,18 @@ static void mb_thread_consume_shutdown(void *args) {
 /* {{{ */
     mb_config_t *mb_config = (mb_config_t *)args;
 
-    if (mb_config->debug)
+    if (mb_config->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_thread_consume: received shutdown signal");
 
     if (mb_config->consumer_connected) {
         if (mb_amqp_disconnect_consumer(mb_config)) {
-            if (mb_config->debug)
+            if (mb_config->debug_level > 0)
                 logit(NSLOG_INFO_MESSAGE, TRUE,
                     "mod_bunny: mb_thread_consume: successfully closed connection to AMQP broker");
         }
     }
 
-    if (mb_config->debug)
+    if (mb_config->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_thread_consume: terminating");
 } /* }}} */
 
@@ -75,7 +75,7 @@ void *mb_thread_publish(void *args)
         /* Loop until we successfully connect to AMQP broker */
         while (!mb_config->publisher_connected) {
             if (!mb_amqp_connect_publisher(mb_config)) {
-                if (mb_config->debug)
+                if (mb_config->debug_level > 0)
                     logit(NSLOG_INFO_MESSAGE, TRUE,
                         "mod_bunny: mb_thread_publish: waiting for %d seconds before retry connecting",
                         mb_config->retry_wait_time);
@@ -105,7 +105,7 @@ void *mb_thread_consume(void *args)
         /* Loop until we successfully connect to AMQP broker */
         while (!mb_config->consumer_connected) {
             if (!mb_amqp_connect_consumer(mb_config)) {
-                if (mb_config->debug)
+                if (mb_config->debug_level > 0)
                     logit(NSLOG_INFO_MESSAGE, TRUE,
                         "mod_bunny: mb_thread_consume: waiting for %d seconds before retry connecting",
                         mb_config->retry_wait_time);
@@ -114,7 +114,7 @@ void *mb_thread_consume(void *args)
             }
         }
 
-        if (mb_config->debug)
+        if (mb_config->debug_level > 0)
             logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_thread_consume: start consuming");
 
         /* Process received check results */

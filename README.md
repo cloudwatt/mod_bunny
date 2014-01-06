@@ -54,7 +54,7 @@ The configuration file is using JSON format. Here are the supported settings and
 * `"hostgroups_routing_table": {}` Mapping of AMQP routing keys/hostgroups to use for dispatching host checks
 * `"servicegroups_routing_table": {}` Mapping of AMQP routing keys/servicegroups to use for dispatching service checks
 * `"retry_wait_time": 3` Time to wait (in seconds) before trying to reconnect to the broker
-* `"debug": false` Debugging flag (useful for troubleshooting error)
+* `"debug_level": 0` Debugging level (0 = none, 1 = show Nagios events and AMQP events, 2 = same as 1 + dump received/sent AMQP messages)
 
 \* : To benefit from the _round-robin_ load-balancing RabbitMQ feature, the publisher exchange **MUST** be of type _direct_. Read [this](http://www.rabbitmq.com/tutorials/amqp-concepts.html#exchange-direct) to understand why.
 

@@ -110,17 +110,17 @@ int nebmodule_deinit(int flags __attribute__((__unused__)), int reason __attribu
     /* Deregister for all events we previously registered for */
     mb_deregister_callbacks();
 
-    if (mod_bunny_config.debug)
+    if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: nebmodule_deinit: deregistered callbacks");
 
     mb_stop_publisher_thread();
 
-    if (mod_bunny_config.debug)
+    if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: nebmodule_deinit: stopped publisher thread");
 
     mb_stop_consumer_thread();
 
-    if (mod_bunny_config.debug)
+    if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: nebmodule_deinit: stopped consumer thread");
 
     /* Purge hostgroups routing table */
@@ -166,7 +166,7 @@ int mb_init(int event_type __attribute__((__unused__)), void *event_data) {
                 "mod_bunny: mb_init: error while initializing configuration, disabling module");
             return (NEB_ERROR);
         } else {
-            if (mod_bunny_config.debug)
+            if (mod_bunny_config.debug_level > 0)
                 logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_init: configuration initialized");
         }
 
@@ -176,7 +176,7 @@ int mb_init(int event_type __attribute__((__unused__)), void *event_data) {
                 "unable to start publisher thread");
             return (NEB_ERROR);
         } else {
-            if (mod_bunny_config.debug)
+            if (mod_bunny_config.debug_level > 0)
                 logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_init: started publisher thread");
         }
 
@@ -186,14 +186,14 @@ int mb_init(int event_type __attribute__((__unused__)), void *event_data) {
                 "unable to start consumer thread");
             return (NEB_ERROR);
         } else {
-            if (mod_bunny_config.debug)
+            if (mod_bunny_config.debug_level > 0)
                 logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_init: started consumer thread");
         }
 
         /* Now register necessary callbacks */
         mb_register_callbacks();
 
-        if (mod_bunny_config.debug)
+        if (mod_bunny_config.debug_level > 0)
             logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_init: registered callbacks");
     }
 
@@ -204,7 +204,7 @@ int mb_init(int event_type __attribute__((__unused__)), void *event_data) {
 int mb_init_config() {
 /* {{{ */
     /* Set default configuration settings */
-    mod_bunny_config.debug = MB_DEFAULT_DEBUG;
+    mod_bunny_config.debug_level = MB_DEFAULT_DEBUG_LEVEL;
     mod_bunny_config.retry_wait_time = MB_DEFAULT_RETRY_WAIT_TIME;
 
     strncpy(mod_bunny_config.host, MB_DEFAULT_HOST, MB_BUF_LEN - 1);
@@ -275,7 +275,7 @@ int mb_handle_event(int event_type, void *event_data) {
 
             /* Let Nagios handle this check if the host is member of local hostgroups */
             if (mod_bunny_config.local_hstgroups && mb_in_local_hostgroups(hst)) {
-                if (mod_bunny_config.debug)
+                if (mod_bunny_config.debug_level > 0)
                     logit(NSLOG_INFO_MESSAGE, TRUE,
                         "mod_bunny: mb_handle_event: host [%s] is member of local hostgroups, "
                         "not handling its check",
@@ -289,7 +289,7 @@ int mb_handle_event(int event_type, void *event_data) {
                 notify users since something might be wrong on the worker side
             */
             if (((host *)hstdata->object_ptr)->check_options & CHECK_OPTION_ORPHAN_CHECK) {
-                if (mod_bunny_config.debug)
+                if (mod_bunny_config.debug_level > 0)
                     logit(NSLOG_INFO_MESSAGE, TRUE,
                         "mod_bunny: mb_handle_event: host check for [%s] has been flagged as orphaned",
                         hstdata->host_name);
@@ -316,7 +316,7 @@ int mb_handle_event(int event_type, void *event_data) {
 
             /* Let Nagios handle this check if the service is member of local servicegroups */
             if (mod_bunny_config.local_svcgroups && mb_in_local_servicegroups(svc)) {
-                if (mod_bunny_config.debug)
+                if (mod_bunny_config.debug_level > 0)
                     logit(NSLOG_INFO_MESSAGE, TRUE,
                         "mod_bunny: mb_handle_event: service [%s/%s] is member of local servicegroups, "
                         "not handling its check",
@@ -331,7 +331,7 @@ int mb_handle_event(int event_type, void *event_data) {
                 notify users since something might be wrong on the worker side
             */
             if (((service *)svcdata->object_ptr)->check_options & CHECK_OPTION_ORPHAN_CHECK) {
-                if (mod_bunny_config.debug)
+                if (mod_bunny_config.debug_level > 0)
                     logit(NSLOG_INFO_MESSAGE, TRUE,
                         "mod_bunny: mb_handle_event: service check for [%s/%s] has been flagged as orphaned",
                         svcdata->host_name,
@@ -368,7 +368,7 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
 
     hst = (host *)hstdata->object_ptr;
 
-    if (mod_bunny_config.debug)
+    if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
             "mod_bunny: mb_handle_host_check: handling host check for [%s]", hstdata->host_name);
 
@@ -431,7 +431,7 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
     if (!routing_key)
         routing_key = mod_bunny_config.publisher_routing_key;
 
-    if (mod_bunny_config.debug)
+    if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
             "mod_bunny: mb_handle_host_check: publishing host check [%s] with routing key \"%s\"",
             hstdata->host_name,
@@ -482,7 +482,7 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     float   prev_latency;
     char    *routing_key = NULL;
 
-    if (mod_bunny_config.debug)
+    if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
             "mod_bunny: mb_handle_service_check: handling service check for [%s/%s]",
             svcdata->host_name,
@@ -548,7 +548,7 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     if (!routing_key)
         routing_key = mod_bunny_config.publisher_routing_key;
 
-    if (mod_bunny_config.debug)
+    if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
             "mod_bunny: mb_handle_service_check: publishing service check [%s/%s] with routing key \"%s\"",
             svcdata->host_name,
@@ -625,11 +625,11 @@ void mb_process_check_result(char *msg) {
 #endif
 
     if (cr->object_check_type == HOST_CHECK) {
-        if (mod_bunny_config.debug)
+        if (mod_bunny_config.debug_level > 0)
             logit(NSLOG_INFO_MESSAGE, TRUE,
                 "mod_bunny: mb_process_check_result: processed host check result for [%s]", cr->host_name);
     } else {
-        if (mod_bunny_config.debug)
+        if (mod_bunny_config.debug_level > 0)
             logit(NSLOG_INFO_MESSAGE, TRUE,
                 "mod_bunny: mb_process_check_result: processed service check result for [%s/%s]",
                 cr->host_name,

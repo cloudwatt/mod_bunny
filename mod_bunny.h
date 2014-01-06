@@ -61,7 +61,7 @@
 #define MB_NOK                              0
 #define MB_BUF_LEN                          1024
 #define MB_MAX_PATH_LEN                     PATH_MAX
-#define MB_DEFAULT_DEBUG                    false
+#define MB_DEFAULT_DEBUG_LEVEL              0
 #define MB_DEFAULT_HOST                     "localhost"
 #define MB_DEFAULT_PORT                     5672
 #define MB_DEFAULT_VHOST                    "/"
@@ -113,7 +113,7 @@ typedef struct mb_svcgroup_route_s {
 
 typedef struct mb_config_s {
 /* {{{ */
-    bool                    debug;
+    int                     debug_level;
     int                     retry_wait_time;
     mb_hstgroup_routes_t    *hstgroups_routing_table;
     mb_svcgroup_routes_t    *svcgroups_routing_table;

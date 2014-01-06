@@ -106,7 +106,7 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
 /* {{{ */
     *amqp_conn->conn = amqp_new_connection();
 
-    if (amqp_conn->debug)
+    if (amqp_conn->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: connecting to host %s:%d using vhost %s",
             context,
             amqp_conn->host,
@@ -142,7 +142,7 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
     }
 #endif
 
-    if (amqp_conn->debug)
+    if (amqp_conn->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: successfully connected to broker", context);
 
 
@@ -161,7 +161,7 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
         goto error;
     }
 
-    if (amqp_conn->debug)
+    if (amqp_conn->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: logged in", context);
 
     amqp_channel_open(*amqp_conn->conn, AMQP_CHANNEL);
@@ -172,7 +172,7 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
         goto error;
     }
 
-    if (amqp_conn->debug)
+    if (amqp_conn->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: opened channel", context);
 
     amqp_exchange_declare(*amqp_conn->conn,             /* connection*/
@@ -192,7 +192,7 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
         goto error;
     }
 
-    if (amqp_conn->debug)
+    if (amqp_conn->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: declared exchange \"%s\"",
             context,
             amqp_conn->exchange);
@@ -219,7 +219,7 @@ static int mb_amqp_disconnect(mb_amqp_connection_t *amqp_conn, const char *conte
         goto error;
     }
 
-    if (amqp_conn->debug)
+    if (amqp_conn->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: closed channel", context);
 
     if (mb_amqp_error(amqp_connection_close(*amqp_conn->conn, AMQP_REPLY_SUCCESS), context) == MB_NOK) {
@@ -229,7 +229,7 @@ static int mb_amqp_disconnect(mb_amqp_connection_t *amqp_conn, const char *conte
         goto error;
     }
 
-    if (amqp_conn->debug)
+    if (amqp_conn->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: closed connection", context);
 
     amqp_destroy_connection(*amqp_conn->conn);
@@ -350,7 +350,7 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
         .password       = config->password,
         .exchange       = config->consumer_exchange,
         .exchange_type  = config->consumer_exchange_type,
-        .debug          = config->debug
+        .debug_level    = config->debug_level
     };
 
     if (!mb_amqp_connect(&conn, "mb_amqp_connect_consumer"))
@@ -375,7 +375,7 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
 
     declared_queue = mb_amqp_bytes_to_cstring(&qd_rc->queue);
 
-    if (config->debug)
+    if (config->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
             "mod_bunny: mb_amqp_connect_consumer: declared queue \"%s\"", declared_queue);
 
@@ -394,7 +394,7 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
         goto error;
     }
 
-    if (config->debug)
+    if (config->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
             "mod_bunny: mb_amqp_connect_consumer: bound queue \"%s\" to exchange \"%s\"",
             declared_queue,
@@ -450,7 +450,7 @@ int mb_amqp_connect_publisher(mb_config_t *config) {
         .password       = config->password,
         .exchange       = config->publisher_exchange,
         .exchange_type  = config->publisher_exchange_type,
-        .debug          = config->debug
+        .debug_level    = config->debug_level
     };
 
     if (mb_amqp_connect(&conn, "mb_amqp_connect_publisher")) {
@@ -477,7 +477,7 @@ int mb_amqp_disconnect_consumer(mb_config_t *config) {
         .password       = config->password,
         .exchange       = config->consumer_exchange,
         .exchange_type  = config->consumer_exchange_type,
-        .debug          = config->debug
+        .debug_level    = config->debug_level
     };
 
     /* Check if the consumer isn't already disconnected */
@@ -506,7 +506,7 @@ int mb_amqp_disconnect_publisher(mb_config_t *config) {
         .password       = config->password,
         .exchange       = config->publisher_exchange,
         .exchange_type  = config->publisher_exchange_type,
-        .debug          = config->debug
+        .debug_level    = config->debug_level
     };
 
     /* Check if the publisher isn't already disconnected */
@@ -524,12 +524,13 @@ int mb_amqp_publish(mb_config_t *config, char *message, char *routing_key) {
     amqp_bytes_t            message_bytes;
     amqp_basic_properties_t message_props;
     int                     rc;
+    char                    *msg_content_type = "application/json";
 
     message_bytes.bytes = message;
     message_bytes.len = strlen(message);
 
     message_props.app_id = amqp_cstring_bytes("Nagios/mod_bunny");
-    message_props.content_type = amqp_cstring_bytes("application/json");
+    message_props.content_type = amqp_cstring_bytes(msg_content_type);
     message_props.delivery_mode = AMQP_DELIVERY_MODE_VOLATILE;
     message_props._flags =
         AMQP_BASIC_APP_ID_FLAG
@@ -549,6 +550,14 @@ int mb_amqp_publish(mb_config_t *config, char *message, char *routing_key) {
     if (rc != 0)
         return (MB_NOK);
 
+    if (config->debug_level > 1)
+        logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_amqp_publish: "
+            "sent message: [content_type=\"%s\" exchange=\"%s\" routing_key=\"%s\" body=\"%s\"]",
+            msg_content_type,
+            config->publisher_exchange,
+            routing_key,
+            message);
+
     return (MB_OK);
 /* }}} */
 }
@@ -557,7 +566,7 @@ void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
 /* {{{ */
     amqp_frame_t    amqp_frame;
     size_t          msg_body_size;
-    char            *msg = NULL;
+    char            *message = NULL;
     int             rc;
 
     amqp_connection_state_t *conn = (amqp_connection_state_t *)&config->consumer_amqp_conn;
@@ -591,19 +600,24 @@ void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
             continue;
         }
 
-        if (!(msg = mb_amqp_read_msg_body(conn, msg_body_size))) {
+        if (!(message = mb_amqp_read_msg_body(conn, msg_body_size))) {
             logit(NSLOG_RUNTIME_ERROR, TRUE,
                 "mod_bunny: mb_amqp_consume: error while reading message body, skipping");
             continue;
         }
 
-        /* Pass the received message to the handler */
-        handler(msg);
+        if (config->debug_level > 1)
+            logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_amqp_consume: received message: [%s]",
+                message);
 
-        free(msg);
+        /* Pass the received message to the handler */
+        handler(message);
+
+
+        free(message);
     }
 
-    if (config->debug)
+    if (config->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_amqp_consume: stopped consuming");
 /* }}} */
 }

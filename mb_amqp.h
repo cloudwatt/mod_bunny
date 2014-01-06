@@ -42,7 +42,7 @@ typedef struct mb_amqp_connection {
     char                    *password;
     char                    *exchange;
     char                    *exchange_type;
-    bool                    debug;
+    int                     debug_level;
 /* }}} */
 } mb_amqp_connection_t;
 

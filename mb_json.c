@@ -425,8 +425,8 @@ int mb_json_parse_config(char *file, mb_config_t *mb_config) {
             mb_json_parse_local_servicegroups, NULL },
         { "retry_wait_time", &mb_config->retry_wait_time, mb_json_is_integer,
             mb_json_parse_int, mb_json_config_check_retry_wait_time },
-        { "debug", &mb_config->debug, mb_json_is_boolean,
-            mb_json_parse_bool, NULL },
+        { "debug_level", &mb_config->debug_level, mb_json_is_integer,
+            mb_json_parse_int, NULL },
         { NULL, NULL, NULL, NULL, NULL },
     };
 
@@ -441,7 +441,7 @@ int mb_json_parse_config(char *file, mb_config_t *mb_config) {
         return (MB_NOK);
     }
 
-    for (mb_json_config_setting_t *setting = config_settings; setting->name ; setting++) {
+    for (mb_json_config_setting_t *setting = config_settings; setting->name; setting++) {
         if ((json_setting_value = json_object_get(json_config, setting->name))) {
             if (!setting->type_check(json_setting_value)) {
                 logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
