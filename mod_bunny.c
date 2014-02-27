@@ -30,6 +30,8 @@ extern check_result *check_result_list;
 extern int          currently_running_host_checks;
 extern int          currently_running_service_checks;
 extern int          event_broker_options;
+extern int          host_check_timeout;
+extern int          service_check_timeout;
 
 /* Our module handle */
 static void *mod_bunny_handle;
@@ -388,6 +390,9 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
     prev_latency = hst->latency;
     hst->latency = hstdata->latency;
 
+    /* Nagios doesn't set the check timeout value prior to "INITIATE" stage, so we'll help ourselves */
+    hstdata->timeout = host_check_timeout;
+
     /* Unset the freshening flag, otherwise only the first freshness check would be run */
     hst->is_being_freshened = FALSE;
 
@@ -509,6 +514,9 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     /* Update latency for macros, event broker, save old value for later */
     prev_latency = svc->latency;
     svc->latency = svcdata->latency;
+
+    /* Nagios doesn't set the check timeout value prior to "INITIATE" stage, so we'll help ourselves */
+    svcdata->timeout = service_check_timeout;
 
     /* Grab the host and service macro variables */
     clear_volatile_macros();
