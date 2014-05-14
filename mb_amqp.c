@@ -525,17 +525,23 @@ int mb_amqp_publish(mb_config_t *config, char *message, char *routing_key) {
     amqp_basic_properties_t message_props;
     int                     rc;
     char                    *msg_content_type = "application/json";
+    char                    *reply_to = NULL;
+
+    reply_to = config->consumer_queue;
 
     message_bytes.bytes = message;
     message_bytes.len = strlen(message);
 
-    message_props.app_id = amqp_cstring_bytes("Nagios/mod_bunny");
-    message_props.content_type = amqp_cstring_bytes(msg_content_type);
-    message_props.delivery_mode = AMQP_DELIVERY_MODE_VOLATILE;
     message_props._flags =
         AMQP_BASIC_APP_ID_FLAG
         | AMQP_BASIC_CONTENT_TYPE_FLAG
-        | AMQP_BASIC_DELIVERY_MODE_FLAG;
+        | AMQP_BASIC_DELIVERY_MODE_FLAG
+        | AMQP_BASIC_REPLY_TO_FLAG;
+
+    message_props.app_id = amqp_cstring_bytes("Nagios/mod_bunny");
+    message_props.content_type = amqp_cstring_bytes(msg_content_type);
+    message_props.delivery_mode = AMQP_DELIVERY_MODE_VOLATILE;
+    message_props.reply_to = amqp_cstring_bytes(reply_to);
 
     rc = amqp_basic_publish(config->publisher_amqp_conn,    /* connection */
         AMQP_CHANNEL,                                       /* channel */
@@ -552,10 +558,11 @@ int mb_amqp_publish(mb_config_t *config, char *message, char *routing_key) {
 
     if (config->debug_level > 1)
         logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_amqp_publish: "
-            "sent message: [content_type=\"%s\" exchange=\"%s\" routing_key=\"%s\" body=\"%s\"]",
+            "sent message: [content_type=\"%s\" exchange=\"%s\" routing_key=\"%s\" reply_to=\"%s\" body=\"%s\"]",
             msg_content_type,
             config->publisher_exchange,
             routing_key,
+            reply_to,
             message);
 
     return (MB_OK);
