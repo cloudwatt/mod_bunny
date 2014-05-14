@@ -433,7 +433,9 @@ int mb_json_parse_config(char *file, mb_config_t *mb_config) {
     if (!(json_config = json_load_file(file, 0, &json_error))) {
         if (json_error.line == -1)
             logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
-                "unable to read configuration file %s", file);
+                "unable to read configuration file %s: %s",
+                file,
+                (strlen(json_error.text) == 0 ? "(unknown error)" : json_error.text));
         else
             logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_json_parse_config: error: "
                 "syntax error in file %s at line %d: %s", file, json_error.line, json_error.text);
