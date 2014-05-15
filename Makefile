@@ -12,6 +12,7 @@ mod_bunny.o: mod_bunny.c
 	$(CC) $(CFLAGS) $(LDFLAGS) \
 		-DNAGIOS_3_5_X=$(NAGIOS_3_5_X) \
 		-o mod_bunny.o \
+		mb_hash.c \
 		mb_json.c \
 		mb_amqp.c \
 		mb_thread.c \

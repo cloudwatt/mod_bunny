@@ -171,6 +171,9 @@ void    mb_register_callbacks(void);
 void    mb_process_check_result(char *);
 int     mb_publish_check(char *, char *);
 
+/* mb_hash.c */
+void    mb_gen_cid(char *, size_t, char *, char *);
+
 /* mb_thread.c */
 void    *mb_thread_consume(void *);
 void    *mb_thread_publish(void *);
