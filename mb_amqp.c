@@ -181,7 +181,7 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
         amqp_cstring_bytes(amqp_conn->exchange_type),   /* type */
         false,                                          /* passive */
         true,                                           /* durable */
-        AMQP_EMPTY_TABLE                                /* arguments */
+        amqp_empty_table                                /* arguments */
     );
     if (mb_amqp_error(amqp_get_rpc_reply(*amqp_conn->conn), context) == MB_NOK) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: error: %s",
@@ -333,6 +333,10 @@ static char *mb_amqp_read_msg_body(amqp_connection_state_t *conn, size_t msg_bod
 
 int mb_amqp_connect_consumer(mb_config_t *config) {
 /* {{{ */
+    amqp_bytes_t            queue_name;
+    bool                    queue_durable_flag;
+    bool                    queue_exclusive_flag;
+    bool                    queue_autodelete_flag;
     char                    *declared_queue = NULL;
     amqp_queue_declare_ok_t *qd_rc = NULL;
 
@@ -356,14 +360,27 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
     if (!mb_amqp_connect(&conn, "mb_amqp_connect_consumer"))
         return (MB_NOK);
 
+    /* If no consumer queue specified, don't declare the queue as 'durable' and make it exclusive */
+    if (strlen(config->consumer_queue) == 0) {
+        queue_name = amqp_empty_bytes;
+        queue_durable_flag = false;
+        queue_exclusive_flag = true;
+        queue_autodelete_flag = true;
+    } else {
+        queue_name = amqp_cstring_bytes(config->consumer_queue);
+        queue_durable_flag = true;
+        queue_exclusive_flag = false;
+        queue_autodelete_flag = false;
+    }
+
     qd_rc = amqp_queue_declare(config->consumer_amqp_conn,  /* connection */
         1,                                                  /* channel */
-        amqp_cstring_bytes(config->consumer_queue),         /* queue */
+        queue_name,                                         /* queue */
         false,                                              /* passive */
-        true,                                               /* durable */
-        false,                                              /* exclusive */
-        false,                                              /* auto_delete */
-        AMQP_EMPTY_TABLE                                    /* arguments */
+        queue_durable_flag,                                 /* durable */
+        queue_exclusive_flag,                               /* exclusive */
+        queue_autodelete_flag,                              /* auto_delete */
+        amqp_empty_table                                    /* arguments */
     );
     if (mb_amqp_error(amqp_get_rpc_reply(config->consumer_amqp_conn), "mb_amqp_connect_consumer") == MB_NOK) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_connect_consumer: error: "
@@ -384,7 +401,7 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
         amqp_cstring_bytes(declared_queue),                 /* queue */
         amqp_cstring_bytes(config->consumer_exchange),      /* exchange */
         amqp_cstring_bytes(config->consumer_binding_key),   /* binding_key */
-        AMQP_EMPTY_TABLE                                    /* arguments */
+        amqp_empty_table                                    /* arguments */
     );
     if (mb_amqp_error(amqp_get_rpc_reply(config->consumer_amqp_conn), "mb_amqp_connect_consumer") == MB_NOK) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_connect_consumer: error: "
@@ -396,9 +413,10 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
 
     if (config->debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
-            "mod_bunny: mb_amqp_connect_consumer: bound queue \"%s\" to exchange \"%s\"",
+            "mod_bunny: mb_amqp_connect_consumer: bound queue \"%s\" to exchange \"%s\" with binding key \"%s\"",
             declared_queue,
-            config->consumer_exchange);
+            config->consumer_exchange,
+            config->consumer_binding_key);
 
     amqp_basic_consume(config->consumer_amqp_conn,  /* connection */
         1,                                          /* channel */
@@ -407,7 +425,7 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
         false,                                      /* no_local */
         true,                                       /* no_ack */
         false,                                      /* exclusive */
-        AMQP_EMPTY_TABLE                            /* arguments */
+        amqp_empty_table                            /* arguments */
     );
     if (mb_amqp_error(amqp_get_rpc_reply(config->consumer_amqp_conn), "mb_amqp_connect_consumer") == MB_NOK) {
         logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_connect_consumer: error: "
