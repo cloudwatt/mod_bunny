@@ -545,7 +545,7 @@ int mb_amqp_publish(mb_config_t *config, char *cid, char *message, char *routing
     char                    *msg_content_type = "application/json";
     char                    *reply_to = NULL;
 
-    reply_to = config->consumer_queue;
+    reply_to = config->consumer_binding_key;
 
     message_bytes.bytes = message;
     message_bytes.len = strlen(message);
