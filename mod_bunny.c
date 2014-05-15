@@ -21,6 +21,7 @@
 */
 
 #include "mod_bunny.h"
+#include "mb_hash.h"
 #include "mb_amqp.h"
 
 NEB_API_VERSION(CURRENT_NEB_API_VERSION);
@@ -362,6 +363,7 @@ int mb_handle_event(int event_type, void *event_data) {
 int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
 /* {{{ */
     host    *hst = NULL;
+    char    cid[MB_HASH_BUF_LEN + 1] = {0};
     char    *json_check = NULL;
     char    *raw_command = NULL;
     char    *processed_command = NULL;
@@ -370,9 +372,14 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
 
     hst = (host *)hstdata->object_ptr;
 
+    /* Generate correlation ID used to track check processing */
+    mb_gen_cid(cid, MB_HASH_BUF_LEN + 1, hstdata->host_name, NULL);
+
     if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
-            "mod_bunny: mb_handle_host_check: handling host check for [%s]", hstdata->host_name);
+            "mod_bunny: %s: mb_handle_host_check: handling host check for [%s]",
+            cid,
+            hstdata->host_name);
 
     /*
         Since we intercepted the host check at early stage,
@@ -407,8 +414,9 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
     get_raw_command_line(hst->check_command_ptr, hst->host_check_command, &raw_command, 0);
 
     if (!raw_command) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_host_check: error: "
-            "host check command undefined");
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: mb_handle_host_check: error: "
+            "host check command undefined",
+            cid);
         goto error;
     }
 
@@ -416,15 +424,17 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
     process_macros(raw_command, &processed_command, 0);
 
     if (!processed_command) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_host_check: error: "
-            "unable to process check command line");
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: mb_handle_host_check: error: "
+            "unable to process check command line",
+            cid);
         goto error;
     }
 
     /* Serialize host check into JSON */
     if (!(json_check = mb_json_pack_host_check(hstdata, hst->check_options, processed_command))) {
         logit(NSLOG_RUNTIME_ERROR, TRUE,
-            "mod_bunny: mb_handle_host_check: error occurred while packing JSON check data");
+            "mod_bunny: %s: mb_handle_host_check: error occurred while packing JSON check data",
+            cid);
         goto error;
     }
 
@@ -438,14 +448,16 @@ int mb_handle_host_check(nebstruct_host_check_data *hstdata) {
 
     if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
-            "mod_bunny: mb_handle_host_check: publishing host check [%s] with routing key \"%s\"",
+            "mod_bunny: %s: mb_handle_host_check: publishing host check [%s] with routing key \"%s\"",
+            cid,
             hstdata->host_name,
             routing_key);
 
     /* Send the JSON-formatted host check message to the broker */
-    if (!mb_publish_check(json_check, routing_key)) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_host_check: error: "
-            "could not publish host check message");
+    if (!mb_publish_check(cid, json_check, routing_key)) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE,"mod_bunny: %s: mb_handle_host_check: error: "
+            "could not publish host check message",
+            cid);
         goto error;
     }
 
@@ -481,15 +493,20 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
 /* {{{ */
     host    *hst = NULL;
     service *svc = NULL;
+    char    cid[MB_HASH_BUF_LEN + 1] = {0};
     char    *json_check = NULL;
     char    *raw_command = NULL;
     char    *processed_command = NULL;
     float   prev_latency;
     char    *routing_key = NULL;
 
+    /* Generate correlation ID used to track check processing */
+    mb_gen_cid(cid, MB_HASH_BUF_LEN + 1, svcdata->host_name, svcdata->service_description);
+
     if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
-            "mod_bunny: mb_handle_service_check: handling service check for [%s/%s]",
+            "mod_bunny: %s: mb_handle_service_check: handling service check for [%s/%s]",
+            cid,
             svcdata->host_name,
             svcdata->service_description);
 
@@ -527,8 +544,9 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     get_raw_command_line(svc->check_command_ptr, svc->service_check_command, &raw_command, 0);
 
     if (!raw_command) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_service_check: error: "
-            "service check command undefined");
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: mb_handle_service_check: error: "
+            "service check command undefined",
+            cid);
         goto error;
     }
 
@@ -536,15 +554,17 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
     process_macros(raw_command, &processed_command, 0);
 
     if (!processed_command) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_service_check: error: "
-            "unable to process check command line");
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: mb_handle_service_check: error: "
+            "unable to process check command line",
+            cid);
         goto error;
     }
 
     /* Serialize service check into JSON */
     if (!(json_check = mb_json_pack_service_check(svcdata, svc->check_options, processed_command))) {
         logit(NSLOG_RUNTIME_ERROR, TRUE,
-            "mod_bunny: mb_handle_service_check: error occurred while packing JSON check data");
+            "mod_bunny: %s: mb_handle_service_check: error occurred while packing JSON check data",
+            cid);
         goto error;
     }
 
@@ -558,15 +578,17 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
 
     if (mod_bunny_config.debug_level > 0)
         logit(NSLOG_INFO_MESSAGE, TRUE,
-            "mod_bunny: mb_handle_service_check: publishing service check [%s/%s] with routing key \"%s\"",
+            "mod_bunny: %s: mb_handle_service_check: publishing service check [%s/%s] with routing key \"%s\"",
+            cid,
             svcdata->host_name,
             svcdata->service_description,
             routing_key);
 
     /* Publish the service check through the AMQP broker */
-    if (!mb_publish_check(json_check, routing_key)) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_handle_service_check: error: "
-            "could not publish service check message");
+    if (!mb_publish_check(cid, json_check, routing_key)) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: mb_handle_service_check: error: "
+            "could not publish service check message",
+            cid);
         goto error;
     }
 
@@ -598,11 +620,12 @@ int mb_handle_service_check(nebstruct_service_check_data *svcdata) {
 /* }}} */
 }
 
-int mb_publish_check(char *check, char *routing_key) {
+int mb_publish_check(char *cid, char *check, char *routing_key) {
 /* {{{ */
-    if (!mb_amqp_publish(&mod_bunny_config, check, routing_key)) {
+    if (!mb_amqp_publish(&mod_bunny_config, cid, check, routing_key)) {
         logit(NSLOG_RUNTIME_ERROR, TRUE,
-            "mod_bunny: mb_amqp_publish_check: error occurred while publishing message");
+            "mod_bunny: %s: mb_amqp_publish_check: error occurred while publishing message",
+            cid);
 
         /* In case of AMQP publishing error, disconnect from the broker as a safety measure */
         mb_amqp_disconnect_publisher(&mod_bunny_config);
