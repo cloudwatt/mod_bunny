@@ -256,6 +256,10 @@ static char *mb_amqp_get_header_field(amqp_frame_t *header, int field) {
         case MB_AMQP_HEADER_FIELD_CONTENT_TYPE:
             return (mb_amqp_bytes_to_cstring(&msg_props->content_type));
 
+        case MB_AMQP_HEADER_FIELD_CORRELATION_ID:
+            return (mb_amqp_bytes_to_cstring(&msg_props->correlation_id));
+            break;
+
         default:
             return (NULL);
     }
@@ -607,6 +611,7 @@ void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
     amqp_frame_t            *header_frame = NULL;
     size_t                  msg_body_size;
     char                    *msg_content_type = NULL;
+    char                    *msg_correlation_id = NULL;
     char                    *message = NULL;
     int                     rc;
 
@@ -662,6 +667,16 @@ void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
             continue;
         }
 
+        if (!(msg_correlation_id = mb_amqp_get_header_field(header_frame, MB_AMQP_HEADER_FIELD_CORRELATION_ID))) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE,
+                "mod_bunny: mb_amqp_consume: error: unable to get message correlation ID, skipping");
+
+            free(header_frame);
+            free(msg_content_type);
+
+            continue;
+        }
+
         msg_body_size = (size_t)header_frame->payload.properties.body_size;
 
         if (!(message = mb_amqp_read_msg_body(conn, msg_body_size))) {
@@ -670,6 +685,7 @@ void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
 
             free(header_frame);
             free(msg_content_type);
+            free(msg_correlation_id);
 
             continue;
         }
@@ -681,8 +697,9 @@ void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
         /* Pass the received message to the handler */
         handler(message);
 
-        free(msg_content_type);
         free(header_frame);
+        free(msg_content_type);
+        free(msg_correlation_id);
         free(message);
     }
 

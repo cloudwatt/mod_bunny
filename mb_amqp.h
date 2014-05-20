@@ -29,6 +29,7 @@
 
 enum mb_amqp_header_fields {
     MB_AMQP_HEADER_FIELD_CONTENT_TYPE,
+    MB_AMQP_HEADER_FIELD_CORRELATION_ID,
 };
 
 typedef struct mb_amqp_connection {
