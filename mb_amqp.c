@@ -148,10 +148,10 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
 
     if (mb_amqp_error(amqp_login(*amqp_conn->conn,  /* connection */
         amqp_conn->vhost,                           /* vhost */
-        0,                                          /* channel_max */
-        131072,                                     /* frame_max */
+        0,                                          /* channel max */
+        131072,                                     /* frame max */
         0,                                          /* heartbeat */
-        AMQP_SASL_METHOD_PLAIN,                     /* sasl_method */
+        AMQP_SASL_METHOD_PLAIN,                     /* sasl method */
         amqp_conn->user,                            /* login */
         amqp_conn->password                         /* password */
     ), context) == MB_NOK) {
@@ -246,40 +246,48 @@ static int mb_amqp_disconnect(mb_amqp_connection_t *amqp_conn, const char *conte
 /* }}} */
 }
 
-static size_t mb_amqp_read_msg_header(amqp_connection_state_t *conn) {
+static char *mb_amqp_get_header_field(amqp_frame_t *header, int field) {
 /* {{{ */
-    amqp_frame_t            amqp_frame;
-    amqp_basic_properties_t *msg_props = NULL;
-    char                    *msg_content_type = NULL;
-    size_t                  msg_body_size;
-    int                     rc;
+   amqp_basic_properties_t  *msg_props = NULL;
 
-    if ((rc = amqp_simple_wait_frame(*conn, &amqp_frame)) < 0) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_read_msg_header: error: "
+   msg_props = header->payload.properties.decoded;
+
+    switch (field) {
+        case MB_AMQP_HEADER_FIELD_CONTENT_TYPE:
+            return (mb_amqp_bytes_to_cstring(&msg_props->content_type));
+
+        default:
+            return (NULL);
+    }
+/* }}} */
+}
+
+static amqp_frame_t *mb_amqp_get_msg_header(amqp_connection_state_t *conn) {
+/* {{{ */
+    amqp_frame_t    *header_frame = NULL;
+    int             rc;
+
+    if (!(header_frame = calloc(1, sizeof(amqp_frame_t)))) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_get_msg_header: error: "
+            "unable to allocate memory");
+        return (NULL);
+    }
+
+    if ((rc = amqp_simple_wait_frame(*conn, header_frame)) < 0) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_get_msg_header: error: "
             "amqp_simple_wait_frame() failed");
-        return (0);
+        free(header_frame);
+        return (NULL);
     }
 
-    if (amqp_frame.frame_type != AMQP_FRAME_HEADER) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_read_msg_header: error: "
+    if (header_frame->frame_type != AMQP_FRAME_HEADER) {
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_get_msg_header: error: "
             "invalid frame type, expected header");
-        return (0);
+        free(header_frame);
+        return (NULL);
     }
 
-    msg_props = amqp_frame.payload.properties.decoded;
-    msg_content_type = mb_amqp_bytes_to_cstring(&msg_props->content_type);
-    msg_body_size = (size_t)amqp_frame.payload.properties.body_size;
-
-    // TODO: check for "application/json" content type
-    if (!msg_content_type) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_read_msg_header: error: "
-            "unable to determine content type");
-        return (0);
-    }
-
-    free(msg_content_type);
-
-    return (msg_body_size);
+    return (header_frame);
 /* }}} */
 }
 
@@ -379,7 +387,7 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
         false,                                              /* passive */
         queue_durable_flag,                                 /* durable */
         queue_exclusive_flag,                               /* exclusive */
-        queue_autodelete_flag,                              /* auto_delete */
+        queue_autodelete_flag,                              /* auto delete */
         amqp_empty_table                                    /* arguments */
     );
     if (mb_amqp_error(amqp_get_rpc_reply(config->consumer_amqp_conn), "mb_amqp_connect_consumer") == MB_NOK) {
@@ -400,7 +408,7 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
         1,                                                  /* channel */
         amqp_cstring_bytes(declared_queue),                 /* queue */
         amqp_cstring_bytes(config->consumer_exchange),      /* exchange */
-        amqp_cstring_bytes(config->consumer_binding_key),   /* binding_key */
+        amqp_cstring_bytes(config->consumer_binding_key),   /* binding key */
         amqp_empty_table                                    /* arguments */
     );
     if (mb_amqp_error(amqp_get_rpc_reply(config->consumer_amqp_conn), "mb_amqp_connect_consumer") == MB_NOK) {
@@ -421,7 +429,7 @@ int mb_amqp_connect_consumer(mb_config_t *config) {
     amqp_basic_consume(config->consumer_amqp_conn,  /* connection */
         1,                                          /* channel */
         qd_rc->queue,                               /* queue */
-        amqp_cstring_bytes("nagios/mod_bunny"),     /* consumer_tag */
+        amqp_cstring_bytes("nagios/mod_bunny"),     /* consumer tag */
         false,                                      /* no_local */
         true,                                       /* no_ack */
         false,                                      /* exclusive */
@@ -566,7 +574,7 @@ int mb_amqp_publish(mb_config_t *config, char *cid, char *message, char *routing
     rc = amqp_basic_publish(config->publisher_amqp_conn,    /* connection */
         AMQP_CHANNEL,                                       /* channel */
         amqp_cstring_bytes(config->publisher_exchange),     /* exchange */
-        amqp_cstring_bytes(routing_key),                    /* routing_key */
+        amqp_cstring_bytes(routing_key),                    /* routing key */
         false,                                              /* mandatory */
         false,                                              /* immediate */
         &message_props,                                     /* properties */
@@ -594,17 +602,20 @@ int mb_amqp_publish(mb_config_t *config, char *cid, char *message, char *routing
 
 void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
 /* {{{ */
-    amqp_frame_t    amqp_frame;
-    size_t          msg_body_size;
-    char            *message = NULL;
-    int             rc;
+    amqp_connection_state_t *conn = NULL;
+    amqp_frame_t            frame;
+    amqp_frame_t            *header_frame = NULL;
+    size_t                  msg_body_size;
+    char                    *msg_content_type = NULL;
+    char                    *message = NULL;
+    int                     rc;
 
-    amqp_connection_state_t *conn = (amqp_connection_state_t *)&config->consumer_amqp_conn;
+    conn = (amqp_connection_state_t *)&config->consumer_amqp_conn;
 
     while (config->consumer_connected) {
         amqp_maybe_release_buffers(*conn);
 
-        if ((rc = amqp_simple_wait_frame(*conn, &amqp_frame))) {
+        if ((rc = amqp_simple_wait_frame(*conn, &frame))) {
             logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_consume: error: "
                 "amqp_simple_wait_frame() failed, skipping frame");
 
@@ -612,27 +623,54 @@ void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
             break;
         }
 
-        if (amqp_frame.frame_type != AMQP_FRAME_METHOD) {
+        if (frame.frame_type != AMQP_FRAME_METHOD) {
             logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_consume: error: "
                 "unexpected frame type, skipping frame");
             continue;
         }
 
-        if (amqp_frame.payload.method.id != AMQP_BASIC_DELIVER_METHOD) {
+        if (frame.payload.method.id != AMQP_BASIC_DELIVER_METHOD) {
             logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_amqp_consume: error: "
                 "unexpected method ID, skipping frame");
             continue;
         }
 
-        if ((msg_body_size = mb_amqp_read_msg_header(conn)) == 0) {
+        if (!(header_frame = mb_amqp_get_msg_header(conn))) {
             logit(NSLOG_RUNTIME_ERROR, TRUE,
                 "mod_bunny: mb_amqp_consume: error while reading message header, skipping");
             continue;
         }
 
+        if (!(msg_content_type = mb_amqp_get_header_field(header_frame, MB_AMQP_HEADER_FIELD_CONTENT_TYPE))) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE,
+                "mod_bunny: mb_amqp_consume: error: unable to get message content-type, skipping");
+
+            free(header_frame);
+
+            continue;
+        }
+
+        if (!MB_STR_MATCH(msg_content_type, "application/json")) {
+            logit(NSLOG_RUNTIME_ERROR, TRUE,
+                "mod_bunny: mb_amqp_consume: error: "
+                "invalid message content-type \"%s\" (expected \"application/json\"), skipping",
+                msg_content_type);
+
+            free(header_frame);
+            free(msg_content_type);
+
+            continue;
+        }
+
+        msg_body_size = (size_t)header_frame->payload.properties.body_size;
+
         if (!(message = mb_amqp_read_msg_body(conn, msg_body_size))) {
             logit(NSLOG_RUNTIME_ERROR, TRUE,
                 "mod_bunny: mb_amqp_consume: error while reading message body, skipping");
+
+            free(header_frame);
+            free(msg_content_type);
+
             continue;
         }
 
@@ -643,7 +681,8 @@ void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
         /* Pass the received message to the handler */
         handler(message);
 
-
+        free(msg_content_type);
+        free(header_frame);
         free(message);
     }
 

@@ -27,6 +27,10 @@
 #define AMQP_DELIVERY_MODE_VOLATILE     1
 #define AMQP_DELIVERY_MODE_PERSISTENT   2
 
+enum mb_amqp_header_fields {
+    MB_AMQP_HEADER_FIELD_CONTENT_TYPE,
+};
+
 typedef struct mb_amqp_connection {
 /* {{{ */
     amqp_connection_state_t *conn;

@@ -77,6 +77,8 @@
 #define MB_DEFAULT_RETRY_WAIT_TIME          3
 #define MB_MAX_RETRY_WAIT_TIME              30
 
+#define MB_STR_MATCH(a, b) ((strlen(a) == strlen(b)) && strncmp(a, b, strlen(b)) == 0 ? true : false)
+
 typedef TAILQ_HEAD(mb_hstgroups_s, mb_hstgroup_s) mb_hstgroups_t;
 typedef struct mb_hstgroup_s {
 /* {{{ */
