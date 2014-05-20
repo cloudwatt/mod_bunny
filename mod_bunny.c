@@ -637,18 +637,20 @@ int mb_publish_check(char *cid, char *check, char *routing_key) {
 /* }}} */
 }
 
-void mb_process_check_result(char *msg) {
+void mb_process_check_result(char *cid, char *msg) {
 /* {{{ */
     check_result *cr = NULL;
 
     assert(msg);
 
     if (!(cr = mb_json_unpack_check_result(msg))) {
-        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: mb_process_check_result: error: "
-            "unable to unpack received check result, discarding");
+        logit(NSLOG_RUNTIME_ERROR, TRUE, "mod_bunny: %s: mb_process_check_result: error: "
+            "unable to unpack received check result, discarding",
+            cid);
         return;
     }
 
+    /* Inject check result into internal Nagios check result list */
 #if NAGIOS_3_5_X
     add_check_result_to_list(&check_result_list, cr);
 #else
@@ -658,11 +660,14 @@ void mb_process_check_result(char *msg) {
     if (cr->object_check_type == HOST_CHECK) {
         if (mod_bunny_config.debug_level > 0)
             logit(NSLOG_INFO_MESSAGE, TRUE,
-                "mod_bunny: mb_process_check_result: processed host check result for [%s]", cr->host_name);
+                "mod_bunny: %s: mb_process_check_result: processed host check result for [%s]",
+                cid,
+                cr->host_name);
     } else {
         if (mod_bunny_config.debug_level > 0)
             logit(NSLOG_INFO_MESSAGE, TRUE,
-                "mod_bunny: mb_process_check_result: processed service check result for [%s/%s]",
+                "mod_bunny: %s: mb_process_check_result: processed service check result for [%s/%s]",
+                cid,
                 cr->host_name,
                 cr->service_description);
     }

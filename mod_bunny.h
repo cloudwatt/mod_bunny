@@ -170,7 +170,7 @@ char    *mb_lookup_hostgroups_routing_table(host *);
 char    *mb_lookup_servicegroups_routing_table(service *);
 void    mb_mark_check_orphaned(char *, char *);
 void    mb_register_callbacks(void);
-void    mb_process_check_result(char *);
+void    mb_process_check_result(char *, char *);
 int     mb_publish_check(char *, char *, char *);
 
 /* mb_hash.c */
@@ -183,7 +183,7 @@ void    *mb_thread_publish(void *);
 /* mb_amqp.c */
 int     mb_amqp_connect_consumer(mb_config_t *);
 int     mb_amqp_connect_publisher(mb_config_t *);
-void    mb_amqp_consume(mb_config_t *, void (*)(char *));
+void    mb_amqp_consume(mb_config_t *, void (*)(char *, char *));
 int     mb_amqp_disconnect_consumer(mb_config_t *);
 int     mb_amqp_disconnect_publisher(mb_config_t *);
 int     mb_amqp_publish(mb_config_t *, char *, char *, char *);

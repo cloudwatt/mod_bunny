@@ -604,7 +604,7 @@ int mb_amqp_publish(mb_config_t *config, char *cid, char *message, char *routing
 /* }}} */
 }
 
-void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
+void mb_amqp_consume(mb_config_t *config, void(* handler)(char *, char *)) {
 /* {{{ */
     amqp_connection_state_t *conn = NULL;
     amqp_frame_t            frame;
@@ -691,11 +691,12 @@ void mb_amqp_consume(mb_config_t *config, void(* handler)(char *)) {
         }
 
         if (config->debug_level > 1)
-            logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: mb_amqp_consume: received message: [%s]",
+            logit(NSLOG_INFO_MESSAGE, TRUE, "mod_bunny: %s: mb_amqp_consume: received message: [%s]",
+                msg_correlation_id,
                 message);
 
         /* Pass the received message to the handler */
-        handler(message);
+        handler(msg_correlation_id, message);
 
         free(header_frame);
         free(msg_content_type);
