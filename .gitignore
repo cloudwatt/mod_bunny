@@ -5,6 +5,9 @@ config.h
 *.log
 *~
 *.orig
+*.o
+*.lo
+*.la
 aclocal.m4
 autom4te.cache/
 compile
@@ -20,5 +23,6 @@ ltmain.sh
 m4/
 missing
 src/.deps/
+src/.libs/
 stamp-h1
 
