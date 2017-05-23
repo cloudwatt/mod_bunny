@@ -651,7 +651,7 @@ void mb_process_check_result(char *cid, char *msg) {
     }
 
     /* Inject check result into internal Nagios check result list */
-#if NAGIOS_3_5_X
+#ifndef NAGIOS_OLDER__ADD_CHECK_RESULT_TO_LIST
     add_check_result_to_list(&check_result_list, cr);
 #else
     add_check_result_to_list(cr);
@@ -716,7 +716,7 @@ void mb_mark_check_orphaned(char *host, char *service) {
         cr->return_code = HOST_UNREACHABLE;
     }
 
-#if NAGIOS_3_5_X
+#ifndef NAGIOS_OLDER__ADD_CHECK_RESULT_TO_LIST
     add_check_result_to_list(&check_result_list, cr);
 #else
     add_check_result_to_list(cr);

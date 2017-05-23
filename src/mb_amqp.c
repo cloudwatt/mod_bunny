@@ -181,6 +181,8 @@ static int mb_amqp_connect(mb_amqp_connection_t *amqp_conn, const char *context)
         amqp_cstring_bytes(amqp_conn->exchange_type),   /* type */
         false,                                          /* passive */
         true,                                           /* durable */
+        0,                                              /* auto_delete */
+        0,                                              /* internal */
         amqp_empty_table                                /* arguments */
     );
     if (mb_amqp_error(amqp_get_rpc_reply(*amqp_conn->conn), context) == MB_NOK) {
