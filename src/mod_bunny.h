@@ -55,8 +55,9 @@
 #include "nebmods.h"
 #include "nebstructs.h"
 #include "neberrors.h"
+#include "config.h"
 
-#define MB_VERSION                          "0.5.0"
+#define MB_VERSION                          PACKAGE_VERSION
 #define MB_OK                               1
 #define MB_NOK                              0
 #define MB_BUF_LEN                          1024
