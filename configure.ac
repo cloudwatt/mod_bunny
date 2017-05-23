@@ -27,7 +27,7 @@ if test "x$with_nagios_include" != x; then
 fi
 
 # Checks for programs.
-AC_PROG_CC
+AC_PROG_CC_STDC
 
 # Checks for libraries.
 
